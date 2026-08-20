@@ -18,6 +18,13 @@ body:
     validations:
       required: true
   - type: textarea
+    id: skeptical_case
+    attributes:
+      label: Why not or why defer
+      description: What complexity, failure, privacy, quality, or operating cost could make the change worse than the current design?
+    validations:
+      required: true
+  - type: textarea
     id: evidence
     attributes:
       label: Existing evidence
@@ -26,9 +33,20 @@ body:
     id: options
     attributes:
       label: Candidate approaches
-      description: List competing options and important contradictions.
+      description: List competing options, including keeping the current design, and important contradictions.
+    validations:
+      required: true
+  - type: textarea
+    id: trigger
+    attributes:
+      label: Adoption trigger
+      description: What observable workload, failure, or quality threshold would justify acting?
+    validations:
+      required: true
   - type: textarea
     id: experiment
     attributes:
       label: Proposed experiment or decision rule
-      description: What result would distinguish the options?
+      description: What result would distinguish the options and permit rejection as well as acceptance?
+    validations:
+      required: true

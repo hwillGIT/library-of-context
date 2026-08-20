@@ -7,8 +7,8 @@
 The Library preserves complete agent threads outside the model and semantically pages
 only protected, recent, and relevant context into each bounded model request.
 
-[Get started](#quick-start){ .md-button .md-button--primary }
-[Explore the governor](CONTEXT_GOVERNOR.md){ .md-button }
+[Get started](GETTING_STARTED.md){ .md-button .md-button--primary }
+[Add it to your agent](ADD_TO_YOUR_AGENT.md){ .md-button }
 
 </div>
 
@@ -54,23 +54,23 @@ Original events remain recoverable, while the model sees a fresh bounded working
 
     Watermarks, queue occupancy, token pressure, and desk swap deltas are visible.
 
--   :material-account-group-outline: **Team-aware evolution**
+-   :material-account-group-outline: **Team memory (design only)**
 
-    Selective promotion can add shared knowledge without centralizing every prompt.
+    The proposed team design promotes selected knowledge without centralizing every
+    prompt. Team sync is not implemented.
 
 </div>
 
 ## Quick start
 
-```bash
-git clone https://github.com/hwillGIT/library-of-context.git
-cd library-of-context
-python -m venv .venv
-python -m pip install -e .
-python -m unittest discover -s tests -v
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\python.exe -m library_of_context quickstart
 ```
 
-Redis is optional. The core has no runtime dependencies beyond Python 3.11 or newer.
+Redis is optional. This disposable self-test uses no Docker, cloud service, model API,
+or retained data. macOS and Linux commands are in [Getting started](GETTING_STARTED.md).
 
 ```python
 from library_of_context import LibraryOfContext
@@ -89,21 +89,18 @@ with LibraryOfContext("data/library.sqlite", redis_url="") as library:
     Send only `request.messages` to the model. Adding the original full transcript again
     defeats the bounded-context invariant.
 
-## Choose your integration
+## Add it to an agent you already run
 
-=== "Python"
+| Integration | What it adds |
+|---|---|
+| Cooperative MCP | Local shelving, retrieval, and a replaceable Library reading desk |
+| Python text-agent wrapper | Automatic bounded context around every stateless model call |
+| Loopback HTTP wrapper | The same automatic lifecycle for non-Python gateways |
 
-    Use `LibraryContextGovernor` directly inside an agent or provider gateway.
-
-=== "MCP"
-
-    Run `python -m library_of_context.mcp_server --no-redis` and use the
-    `library_context_*` lifecycle tools.
-
-=== "HTTP"
-
-    Run `python -m library_of_context --no-redis serve` and call the loopback
-    `/context/prepare` and `/context/commit` endpoints.
+An MCP tool cannot rewrite the host request that already invoked it. Automatic context
+governance requires control of the model-call boundary. The
+[agent integration guide](ADD_TO_YOUR_AGENT.md) gives tested, copy-and-paste paths and
+explains how to isolate projects and threads.
 
 ## Alpha status
 
@@ -112,6 +109,12 @@ vector retrieval still scans a namespace, the tokenizer is approximate, and team
 and ACLs are designs rather than shipped features. See
 [Performance and scaling](PERFORMANCE_AND_SCALING.md) and the
 [research agenda](roadmap.md).
+
+Future components are conditional rather than mandatory. Read
+[Why these improvements?](WHY_THE_ROADMAP.md) for the problem each proposal addresses,
+the reasons to defer it, simpler alternatives, adoption triggers, and evidence gates.
+The [capability status](STATUS.md) page separates implemented behavior from experiments
+and future design.
 
 Contributions that bring evidence, alternatives, failure tests, and privacy review are
 especially welcome.

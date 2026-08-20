@@ -9,8 +9,8 @@ persistent, semantically paged memory. It manages two failure modes:
 2. **over-expiration:** old information is truncated or compressed before it is safely
    recoverable.
 
-The system preserves complete context outside the model and constructs a fresh bounded
-working set for every governed call. It increases addressable context, not the model's
+The system preserves every event recorded through the governor and constructs a bounded
+working set for each governed call. It increases addressable context, not the model's
 physical input limit.
 
 ## Core invariants
@@ -95,7 +95,7 @@ count, token pressure, the reading-desk swap delta, and visibility watermarks.
 
 | Tier | Structure | Policy | Correctness role |
 |---|---|---|---|
-| Immediate thread overlay | Token-aware FIFO ring | Event and token bounds | Fresh visibility |
+| Immediate thread overlay | Token-aware FIFO ring | Event bound and token target; one oversized event may remain | Fresh visibility |
 | Process hot tier | Byte-estimated LRU | Record/query budgets | Disposable |
 | Shared local hot tier | Redis | TTL and LFU | Disposable |
 | Durable library | SQLite WAL | Disk/quota policy | Authoritative |
@@ -141,21 +141,43 @@ swapped_out = previous desk - new desk
 retained    = new desk ∩ previous desk
 ```
 
-The FTS path is bounded by candidate count. The portable vector path still exact-scores
-all live records in a namespace. An ANN adapter is required for consistently bounded
-retrieval work at large cardinalities.
+FTS output and downstream record hydration are bounded by candidate count, although
+SQLite FTS may still inspect a selectivity-dependent posting list internally. The
+portable vector path exact-scores all live records in a namespace. An ANN adapter is
+required for consistently bounded retrieval work after the exact path crosses a
+declared large-catalog latency or memory target.
 
 ## Process and concurrency model
 
 The current implementation can run in-process, through the local HTTP server, or as a
 STDIO MCP process. Each governor has one bounded worker ring and one indexing thread.
-SQLite access is serialized through the store connection lock. This is correct for a
-small local prototype but is not the final workstation-scale process model.
+SQLite access is serialized through the store connection lock. This process model
+targets a small local workload and duplicates workers and cache state when several agent
+processes run concurrently.
+
+The in-process `GovernedTextAgent` and HTTP boundary can enforce a fresh bounded request
+because they own the subsequent model call. A normal MCP host invokes tools from inside
+an existing turn, so its safe profile is cooperative shelving and reading-desk recall;
+it cannot use the tool result to retroactively bound that turn.
 
 The intended next topology is one supervised Library daemon per workstation, with thin
 MCP/HTTP/named-pipe bridges. A fixed worker pool would partition events by
 `(project_id, thread_id)`, preserve order inside a thread, and process independent
 threads concurrently.
+
+### Code organization
+
+| Modules | Responsibility |
+|---|---|
+| `library`, `engine` | Public storage API, cache tiers, persistence, and retrieval coordination |
+| `governor`, `prompt_builder` | Governed-turn lifecycle and bounded request assembly |
+| `indexing`, `rings`, `text_budget` | Outbox processing, bounded queues, recent events, and text budgeting |
+| `store`, `ram`, `redis_hot` | SQLite authority and disposable cache implementations |
+| `swapper`, `resource_registry` | Reading-desk state and thread-safe session ownership |
+| `agent` | Stateless text-model call boundary |
+| `http_app`, `server` | Transport-neutral HTTP routes and HTTP I/O |
+| `mcp_schema`, `mcp_views`, `mcp_service`, `mcp_server` | MCP contracts, serialization, tool execution, and JSON-RPC I/O |
+| `cli_parser`, `cli_config`, `cli_commands`, `quickstart` | Command definitions, runtime construction, command execution, and diagnostics |
 
 ## Failure behavior
 
@@ -206,5 +228,6 @@ and authorization filters enforced before candidate retrieval and hydration.
 - There is no team sync, ACL, branch merge, or knowledge-promotion implementation yet.
 - The MCP integration cannot replace an undocumented host-internal compaction hook.
 
-These limitations are public work items, not hidden assumptions. See
-[Performance and Scaling](docs/PERFORMANCE_AND_SCALING.md) and [Roadmap](ROADMAP.md).
+See [Performance and Scaling](docs/PERFORMANCE_AND_SCALING.md),
+[Why These Improvements?](docs/WHY_THE_ROADMAP.md), and [Roadmap](ROADMAP.md) for planned
+changes and evaluation criteria.

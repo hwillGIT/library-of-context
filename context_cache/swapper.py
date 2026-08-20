@@ -39,43 +39,43 @@ class ContextSwapper:
     def _key(namespace: str, session_id: str) -> tuple[str, str]:
         return namespace, session_id
 
-    def refresh(
+    def _retrieve_and_order_hits(
         self,
-        session_id: str,
         focus: str,
         *,
-        token_budget: int = 4000,
-        top_k: int = 12,
-        namespace: str | None = None,
-        filters: dict[str, Any] | None = None,
-        pinned_record_ids: list[str] | None = None,
-        exclude_record_ids: list[str] | None = None,
-    ) -> WorkingSet:
-        if token_budget <= 0:
-            raise ValueError("token_budget must be positive")
-        ns = self.cache.namespace if namespace is None else namespace
-        previous = self.get(session_id, namespace=ns)
+        namespace: str,
+        top_k: int,
+        filters: dict[str, Any] | None,
+        pinned_record_ids: list[str] | None,
+        exclude_record_ids: list[str] | None,
+    ) -> list[SearchHit]:
         hits = self.cache.retrieve(
             focus,
             top_k=max(top_k, top_k * 3),
-            namespace=ns,
+            namespace=namespace,
             filters=filters,
         )
         excluded = set(exclude_record_ids or [])
         if excluded:
             hits = [hit for hit in hits if hit.record.id not in excluded]
+
         by_id = {hit.record.id: hit for hit in hits}
         ordered: list[SearchHit] = []
         for record_id in pinned_record_ids or []:
             hit = by_id.pop(record_id, None)
             if hit is None:
-                record = self.cache.get(record_id, namespace=ns)
+                record = self.cache.get(record_id, namespace=namespace)
                 if record is not None:
                     hit = SearchHit(record, 1.0, 1.0, 0.0, 1.0, 1.0)
             if hit is not None:
                 ordered.append(hit)
         ordered.extend(hit for hit in hits if hit.record.id in by_id)
+        return ordered
 
+    @staticmethod
+    def _pack_hits(
+        ordered: list[SearchHit], *, token_budget: int, top_k: int
+    ) -> tuple[list[SearchHit], str]:
         selected: list[SearchHit] = []
         sections: list[str] = []
         used = 0
@@ -107,12 +107,59 @@ class ContextSwapper:
         # Enforce the same estimator used by callers, including inter-section spacing.
         if estimate_tokens(context) > token_budget:
             context = context[: token_budget * 4]
+        return selected, context
+
+    @staticmethod
+    def _swap_diff(
+        previous: WorkingSet | None, selected: list[SearchHit]
+    ) -> tuple[list[str], list[str], list[str]]:
         previous_ids = (
             [] if previous is None else [hit.record.id for hit in previous.hits]
         )
         selected_ids = [hit.record.id for hit in selected]
         previous_id_set = set(previous_ids)
         selected_id_set = set(selected_ids)
+        swapped_in = [
+            record_id for record_id in selected_ids if record_id not in previous_id_set
+        ]
+        swapped_out = [
+            record_id for record_id in previous_ids if record_id not in selected_id_set
+        ]
+        retained = [
+            record_id for record_id in selected_ids if record_id in previous_id_set
+        ]
+        return swapped_in, swapped_out, retained
+
+    def refresh(
+        self,
+        session_id: str,
+        focus: str,
+        *,
+        token_budget: int = 4000,
+        top_k: int = 12,
+        namespace: str | None = None,
+        filters: dict[str, Any] | None = None,
+        pinned_record_ids: list[str] | None = None,
+        exclude_record_ids: list[str] | None = None,
+    ) -> WorkingSet:
+        if token_budget <= 0:
+            raise ValueError("token_budget must be positive")
+        ns = self.cache.namespace if namespace is None else namespace
+        previous = self.get(session_id, namespace=ns)
+        ordered = self._retrieve_and_order_hits(
+            focus,
+            namespace=ns,
+            top_k=top_k,
+            filters=filters,
+            pinned_record_ids=pinned_record_ids,
+            exclude_record_ids=exclude_record_ids,
+        )
+        selected, context = self._pack_hits(
+            ordered,
+            token_budget=token_budget,
+            top_k=top_k,
+        )
+        swapped_in, swapped_out, retained = self._swap_diff(previous, selected)
         working_set = WorkingSet(
             session_id=session_id,
             namespace=ns,
@@ -122,19 +169,9 @@ class ContextSwapper:
             token_count=estimate_tokens(context),
             token_budget=token_budget,
             refreshed_at=time.time(),
-            swapped_in=[
-                record_id
-                for record_id in selected_ids
-                if record_id not in previous_id_set
-            ],
-            swapped_out=[
-                record_id
-                for record_id in previous_ids
-                if record_id not in selected_id_set
-            ],
-            retained=[
-                record_id for record_id in selected_ids if record_id in previous_id_set
-            ],
+            swapped_in=swapped_in,
+            swapped_out=swapped_out,
+            retained=retained,
         )
         with self._lock:
             self._working_sets[self._key(ns, session_id)] = working_set

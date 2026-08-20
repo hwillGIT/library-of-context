@@ -18,10 +18,26 @@ body:
     validations:
       required: true
   - type: textarea
+    id: why_now
+    attributes:
+      label: Why now and adoption trigger
+      description: What evidence or measurable condition makes the added complexity worthwhile now?
+    validations:
+      required: true
+  - type: textarea
+    id: why_not
+    attributes:
+      label: Why not, costs, and non-goals
+      description: When is the current design better, what new failures or operational costs appear, and what is deliberately out of scope?
+    validations:
+      required: true
+  - type: textarea
     id: alternatives
     attributes:
       label: Alternatives and trade-offs
-      description: Include at least one viable alternative when possible.
+      description: Include at least one viable alternative and the option to defer or keep the current design.
+    validations:
+      required: true
   - type: textarea
     id: invariants
     attributes:
@@ -32,5 +48,7 @@ body:
   - type: textarea
     id: validation
     attributes:
-      label: Validation
-      description: How should correctness, retrieval quality, and performance be tested?
+      label: Evidence gate
+      description: Which correctness, quality, resource, failure, privacy, and migration results would justify accepting or rejecting the proposal?
+    validations:
+      required: true

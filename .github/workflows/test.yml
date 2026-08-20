@@ -24,6 +24,8 @@ jobs:
         run: ruff check context_cache library_of_context tests examples
       - name: Check formatting
         run: ruff format --check context_cache library_of_context tests examples
+      - name: Check spelling
+        run: codespell .
 
   test:
     name: Python ${{ matrix.python-version }} on ${{ matrix.os }}
@@ -45,6 +47,8 @@ jobs:
         run: python -m compileall -q context_cache library_of_context
       - name: Test
         run: python -m unittest discover -s tests -v
+      - name: Smoke test normal-user quickstart
+        run: python -m library_of_context quickstart
       - name: Smoke test governed example
         run: python examples/governed_loop.py
 

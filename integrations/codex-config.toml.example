@@ -1,14 +1,19 @@
-# Copy this table into a trusted project's .codex/config.toml, then replace cwd
-# with the absolute path to this repository. This file is a template and is not active.
+# Cooperative MCP profile for one trusted project. Copy this table into the target
+# project's .codex/config.toml and replace every placeholder. This file is not active.
+#
+# Use the Python executable from the environment where you installed the Library:
+# Windows: C:/absolute/path/to/library-of-context/.venv/Scripts/python.exe
+# macOS/Linux: /absolute/path/to/library-of-context/.venv/bin/python
 [mcp_servers.library_of_context]
-command = "python"
+command = "C:/absolute/path/to/library-of-context/.venv/Scripts/python.exe"
 args = [
   "-m",
   "library_of_context.mcp_server",
+  "--no-redis",
   "--db",
-  "data/library-of-context.sqlite",
-  "--ram-mb",
-  "2048",
+  "C:/absolute/path/to/library-of-context/data/your-project.sqlite",
+  "--namespace",
+  "replace-with-your-project-slug",
 ]
 cwd = "C:/absolute/path/to/library-of-context"
 startup_timeout_sec = 10
@@ -24,7 +29,5 @@ enabled_tools = [
   "library_desk_get",
   "library_desk_watch",
   "library_desk_stop",
-  "library_message_record",
-  "library_prompt_build",
   "library_stats",
 ]

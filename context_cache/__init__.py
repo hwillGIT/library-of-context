@@ -1,5 +1,6 @@
 """The Library of Context: virtual memory for bounded model context."""
 
+from .agent import GovernedTextAgent
 from .embeddings import HashingEmbedder, OllamaEmbedder
 from .engine import ContextCache
 from .governor import LibraryContextGovernor
@@ -23,6 +24,7 @@ __all__ = [
     "ContextSwapper",
     "ContextWatermarks",
     "GovernedPrompt",
+    "GovernedTextAgent",
     "HashingEmbedder",
     "LibraryOfContext",
     "LibraryContextGovernor",

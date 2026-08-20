@@ -2,18 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 import os
 import threading
 import time
 import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any
 
 from .embeddings import Embedder, HashingEmbedder, estimate_tokens
 from .models import ContextRecord, SearchHit
 from .ram import ByteLRU, record_size
 from .redis_hot import RedisHotCache
+from .retrieval import RANKER_VERSION, RetrievalPolicy, rank_records
 from .store import SQLiteStore
 
 if TYPE_CHECKING:
@@ -29,7 +29,7 @@ def chunk_text(text: str, max_tokens: int = 450, overlap_tokens: int = 60) -> li
     words = text.split()
     if not words:
         return []
-    # A word averages about 1.3 model tokens; bias smaller to respect budgets.
+    # Use 1.3 tokens per whitespace-delimited word as a coarse packing heuristic.
     max_words = max(1, int(max_tokens / 1.3))
     overlap_words = int(overlap_tokens / 1.3)
     chunks: list[str] = []
@@ -43,27 +43,8 @@ def chunk_text(text: str, max_tokens: int = 450, overlap_tokens: int = 60) -> li
     return chunks
 
 
-def _dot(left: Sequence[float], right: Sequence[float]) -> float:
-    if len(left) != len(right) or not left:
-        return 0.0
-    return sum(a * b for a, b in zip(left, right))
-
-
-def _metadata_matches(metadata: dict[str, Any], filters: dict[str, Any] | None) -> bool:
-    if not filters:
-        return True
-    for key, expected in filters.items():
-        actual = metadata.get(key)
-        if isinstance(expected, list):
-            if actual not in expected:
-                return False
-        elif actual != expected:
-            return False
-    return True
-
-
 class ContextCache:
-    """Three-tier context library with hybrid RAG retrieval.
+    """Three-tier context store with hybrid lexical and vector retrieval.
 
     L1 is an in-process byte-bounded LRU, L2 is optional local Redis, and L3 is
     durable SQLite. SQLite is always authoritative.
@@ -265,6 +246,20 @@ class ContextCache:
     def source_count(self, source: str, *, namespace: str | None = None) -> int:
         return self.store.count_source(self._namespace(namespace), source)
 
+    def _embedder_cache_identity(self) -> dict[str, Any]:
+        embedder_type = type(self.embedder)
+        identity: dict[str, Any] = {
+            "class": f"{embedder_type.__module__}.{embedder_type.__qualname__}",
+            "dimensions": self.embedder.dimensions,
+        }
+        for attribute in ("model", "base_url", "include_bigrams"):
+            if not hasattr(self.embedder, attribute):
+                continue
+            value = getattr(self.embedder, attribute)
+            if value is None or isinstance(value, (str, int, float, bool)):
+                identity[attribute] = value
+        return identity
+
     def _query_cache_key(
         self,
         namespace: str,
@@ -272,6 +267,7 @@ class ContextCache:
         top_k: int,
         filters: dict[str, Any] | None,
         minimum_score: float,
+        policy: RetrievalPolicy,
     ) -> str:
         value = {
             "namespace": namespace,
@@ -280,10 +276,92 @@ class ContextCache:
             "filters": filters,
             "minimum_score": minimum_score,
             "generation": self._generation(namespace),
-            "embedder": type(self.embedder).__name__,
-            "dimensions": self.embedder.dimensions,
+            "ranker": RANKER_VERSION,
+            "policy": policy.cache_identity(),
+            "embedder": self._embedder_cache_identity(),
         }
         return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+
+    def _get_cached_hits(
+        self,
+        namespace: str,
+        cache_key: str,
+        digest: str,
+    ) -> list[SearchHit] | None:
+        cached = self.query_ram.get(digest)
+        if cached is not None:
+            return cached
+        if self.redis is None:
+            return None
+        cached = self.redis.get_query(namespace, cache_key)
+        if cached is None:
+            return None
+        encoded_size = len(json.dumps([hit.to_dict() for hit in cached]))
+        self.query_ram.put(
+            digest,
+            cached,
+            size=encoded_size,
+            ttl_seconds=self.redis.query_ttl,
+        )
+        return cached
+
+    def _rank_query(
+        self,
+        query: str,
+        namespace: str,
+        *,
+        top_k: int,
+        filters: dict[str, Any] | None,
+        minimum_score: float,
+        policy: RetrievalPolicy,
+    ) -> list[SearchHit]:
+        query_vector = self.embedder.embed([query])[0]
+        records = self.store.list_records(namespace)
+        lexical_scores = dict(
+            self.store.lexical_search(namespace, query, limit=max(64, top_k * 8))
+        )
+        return rank_records(
+            records,
+            query_vector,
+            lexical_scores,
+            filters=filters,
+            minimum_score=minimum_score,
+            top_k=top_k,
+            policy=policy,
+            now=time.time(),
+        )
+
+    def _publish_records(self, namespace: str, hits: list[SearchHit]) -> None:
+        if not hits:
+            return
+        touched_at = time.time()
+        self.store.touch_many(
+            namespace,
+            (hit.record.id for hit in hits),
+            touched_at,
+        )
+        for hit in hits:
+            hit.record.accessed_at = touched_at
+            self.ram.put(
+                self._ram_key(namespace, hit.record.id),
+                hit.record,
+                size=record_size(hit.record),
+            )
+            if self.redis is not None:
+                self.redis.put_record(hit.record)
+
+    def _cache_hits(
+        self,
+        namespace: str,
+        cache_key: str,
+        digest: str,
+        hits: list[SearchHit],
+    ) -> None:
+        encoded_size = len(json.dumps([hit.to_dict() for hit in hits])) + 128
+        query_ttl = 60 if self.redis is None else self.redis.query_ttl
+        self.query_ram.put(digest, hits, size=encoded_size, ttl_seconds=query_ttl)
+        if self.redis is not None:
+            self.redis.put_query(namespace, cache_key, hits)
 
     def retrieve(
         self,
@@ -304,76 +382,35 @@ class ContextCache:
         if top_k <= 0:
             return []
         ns = self._namespace(namespace)
-        cache_key = self._query_cache_key(ns, query, top_k, filters, minimum_score)
+        policy = RetrievalPolicy(
+            vector_weight=vector_weight,
+            lexical_weight=lexical_weight,
+            importance_weight=importance_weight,
+            recency_weight=recency_weight,
+            recency_half_life_days=recency_half_life_days,
+        )
+        cache_key = self._query_cache_key(
+            ns,
+            query,
+            top_k,
+            filters,
+            minimum_score,
+            policy,
+        )
         digest = hashlib.sha256(cache_key.encode("utf-8")).hexdigest()
-        cached = self.query_ram.get(digest)
+        cached = self._get_cached_hits(ns, cache_key, digest)
         if cached is not None:
             return cached
-        if self.redis is not None:
-            cached = self.redis.get_query(ns, cache_key)
-            if cached is not None:
-                encoded_size = len(json.dumps([hit.to_dict() for hit in cached]))
-                self.query_ram.put(
-                    digest, cached, size=encoded_size, ttl_seconds=self.redis.query_ttl
-                )
-                return cached
-
-        query_vector = self.embedder.embed([query])[0]
-        records = self.store.list_records(ns)
-        lexical = dict(self.store.lexical_search(ns, query, limit=max(64, top_k * 8)))
-        now = time.time()
-        half_life = max(1.0, recency_half_life_days * 86400.0)
-        total_weight = max(
-            1e-9,
-            vector_weight + lexical_weight + importance_weight + recency_weight,
+        hits = self._rank_query(
+            query,
+            ns,
+            top_k=top_k,
+            filters=filters,
+            minimum_score=minimum_score,
+            policy=policy,
         )
-        hits: list[SearchHit] = []
-        for record in records:
-            if not _metadata_matches(record.metadata, filters):
-                continue
-            cosine = max(-1.0, min(1.0, _dot(query_vector, record.embedding)))
-            vector_score = (cosine + 1.0) / 2.0
-            lexical_score = lexical.get(record.id, 0.0)
-            importance_score = max(0.0, min(1.0, record.importance))
-            age = max(0.0, now - max(record.updated_at, record.accessed_at))
-            recency_score = math.exp(-math.log(2.0) * age / half_life)
-            score = (
-                vector_weight * vector_score
-                + lexical_weight * lexical_score
-                + importance_weight * importance_score
-                + recency_weight * recency_score
-            ) / total_weight
-            if score >= minimum_score:
-                hits.append(
-                    SearchHit(
-                        record=record,
-                        score=score,
-                        vector_score=vector_score,
-                        lexical_score=lexical_score,
-                        importance_score=importance_score,
-                        recency_score=recency_score,
-                    )
-                )
-        hits.sort(key=lambda hit: (hit.score, hit.record.updated_at), reverse=True)
-        hits = hits[:top_k]
-        if hits:
-            touched_at = time.time()
-            self.store.touch_many(ns, (hit.record.id for hit in hits), touched_at)
-            for hit in hits:
-                hit.record.accessed_at = touched_at
-                self.ram.put(
-                    self._ram_key(ns, hit.record.id),
-                    hit.record,
-                    size=record_size(hit.record),
-                )
-                if self.redis is not None:
-                    self.redis.put_record(hit.record)
-
-        encoded_size = len(json.dumps([hit.to_dict() for hit in hits])) + 128
-        query_ttl = 60 if self.redis is None else self.redis.query_ttl
-        self.query_ram.put(digest, hits, size=encoded_size, ttl_seconds=query_ttl)
-        if self.redis is not None:
-            self.redis.put_query(ns, cache_key, hits)
+        self._publish_records(ns, hits)
+        self._cache_hits(ns, cache_key, digest, hits)
         return hits
 
     def purge_expired(self) -> int:
@@ -413,6 +450,8 @@ class ContextCache:
         worker_poll_seconds: float = 0.1,
         start_worker: bool = True,
     ) -> "LibraryContextGovernor":
+        """Create a context governor for one agent thread."""
+
         from .governor import LibraryContextGovernor
 
         return LibraryContextGovernor(

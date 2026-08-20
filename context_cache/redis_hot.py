@@ -7,6 +7,7 @@ import threading
 import time
 import urllib.parse
 import zlib
+from collections.abc import Callable
 from typing import Any
 
 from .models import ContextRecord, SearchHit, WorkingSet
@@ -38,6 +39,13 @@ class RedisClient:
         self._socket: socket.socket | None = None
         self._stream: Any = None
         self._lock = threading.RLock()
+        self._response_readers: dict[bytes, Callable[[bytes], Any]] = {
+            b"+": self._read_text,
+            b"-": self._read_error,
+            b":": self._read_integer,
+            b"$": self._read_bulk,
+            b"*": self._read_array,
+        }
 
     @staticmethod
     def _encode(parts: tuple[Any, ...]) -> bytes:
@@ -57,27 +65,38 @@ class RedisClient:
         if not line.endswith(b"\r\n"):
             raise OSError("Invalid Redis response")
         payload = line[:-2]
-        if prefix == b"+":
-            return payload.decode("utf-8")
-        if prefix == b"-":
-            raise RedisError(payload.decode("utf-8", errors="replace"))
-        if prefix == b":":
-            return int(payload)
-        if prefix == b"$":
-            length = int(payload)
-            if length == -1:
-                return None
-            value = self._stream.read(length)
-            trailer = self._stream.read(2)
-            if trailer != b"\r\n":
-                raise OSError("Invalid Redis bulk response")
-            return value
-        if prefix == b"*":
-            length = int(payload)
-            if length == -1:
-                return None
-            return [self._read() for _ in range(length)]
-        raise OSError(f"Unknown Redis response prefix: {prefix!r}")
+        reader = self._response_readers.get(prefix)
+        if reader is None:
+            raise OSError(f"Unknown Redis response prefix: {prefix!r}")
+        return reader(payload)
+
+    @staticmethod
+    def _read_text(payload: bytes) -> str:
+        return payload.decode("utf-8")
+
+    @staticmethod
+    def _read_error(payload: bytes) -> None:
+        raise RedisError(payload.decode("utf-8", errors="replace"))
+
+    @staticmethod
+    def _read_integer(payload: bytes) -> int:
+        return int(payload)
+
+    def _read_bulk(self, payload: bytes) -> bytes | None:
+        length = int(payload)
+        if length == -1:
+            return None
+        value = self._stream.read(length)
+        trailer = self._stream.read(2)
+        if trailer != b"\r\n":
+            raise OSError("Invalid Redis bulk response")
+        return value
+
+    def _read_array(self, payload: bytes) -> list[Any] | None:
+        length = int(payload)
+        if length == -1:
+            return None
+        return [self._read() for _ in range(length)]
 
     def _send(self, *parts: Any) -> Any:
         self._socket.sendall(self._encode(parts))

@@ -6,6 +6,14 @@ What problem does this change solve?
 
 Describe the implementation, alternatives considered, and important failure behavior.
 
+## Decision context
+
+- Why is this change better than keeping the current design for the declared workload?
+- Who should not enable or adopt it yet?
+- What measured trigger justified implementation?
+- What result would cause us to reject or roll it back?
+- Which non-goals and new operational responsibilities should reviewers understand?
+
 ## Invariants
 
 - [ ] Durable context remains safe before prompt eviction.
@@ -21,6 +29,7 @@ Describe the implementation, alternatives considered, and important failure beha
 - [ ] `python -m unittest discover -s tests -v`
 - [ ] Public behavior is documented.
 - [ ] Performance changes include quality and resource evidence.
+- [ ] The evidence gate can reject the change as well as confirm it.
 
 ## Compatibility and migration
 
