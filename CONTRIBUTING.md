@@ -9,10 +9,10 @@ engineers, privacy specialists, technical writers, and curious users.
 Changes must preserve these invariants:
 
 - acknowledged context is durable before it can leave the model prompt;
-- prompt size remains bounded;
-- recent unindexed events remain visible;
+- prompt size is bounded;
+- recent unindexed events are visible;
 - bounded queue overflow never becomes durable data loss;
-- SQLite remains authoritative in local mode;
+- SQLite is authoritative in local mode;
 - remote/team services do not become mandatory for local prompt construction;
 - authorization is applied before shared-context hydration.
 
@@ -128,6 +128,29 @@ against the exact scorer.
 - Favor plain technical English and document failure behavior.
 - Keep provider-specific code behind adapters.
 - Avoid silently weakening durability, privacy, ordering, or budget guarantees.
+
+## Editorial standard
+
+Write explanatory documentation, examples, help text, docstrings, and comments in one
+editorial present. Describe the system contract and operational rationale, not the
+sequence of edits or the author's process. Do not refer to the prompt, requester,
+drafting process, or refactoring process. Do not describe when one section, component,
+example, or explanation was added relative to another. Present the complete structure
+directly.
+
+Put completed change history in `CHANGELOG.md`; capability state and future sequence in
+the status and roadmap documents; version transitions in compatibility or migration
+sections; and publication or access dates in citations. Preserve time-relative words
+when they identify actual runtime state.
+
+Use the repository's
+[timeless technical prose skill](.agents/skills/write-timeless-technical-prose/SKILL.md)
+for the full editing and review procedure. Prefer concrete mechanisms and measurable
+claims over promotional terms or unsupported comparisons.
+Do not use updated, latest, or improved as freestanding labels for explanatory material.
+State the resulting behavior, version boundary, or measured comparison instead.
+Use sequence words only when they specify technical order, including procedures,
+runtime transitions, dependencies, migrations, and evaluation protocols.
 
 ## Security and privacy
 

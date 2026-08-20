@@ -20,8 +20,8 @@ body:
   - type: textarea
     id: why_now
     attributes:
-      label: Why now and adoption trigger
-      description: What evidence or measurable condition makes the added complexity worthwhile now?
+      label: Adoption trigger
+      description: What evidence or measurable condition makes the added complexity worthwhile?
     validations:
       required: true
   - type: textarea

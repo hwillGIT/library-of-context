@@ -68,8 +68,8 @@ class QueueAndBudgetTests(unittest.TestCase):
         self.assertEqual(truncate_text("abc", 1, marker=" [more]"), "abc")
 
 
-class RegistryCompatibilityTests(unittest.TestCase):
-    def test_mcp_schema_constants_remain_available_from_the_server_module(self) -> None:
+class RegistryAndExportContractTests(unittest.TestCase):
+    def test_server_module_reexports_mcp_schema_constants(self) -> None:
         self.assertIs(SERVER_INSTRUCTIONS, SCHEMA_INSTRUCTIONS)
         self.assertIs(TOOLS, SCHEMA_TOOLS)
 
@@ -97,7 +97,7 @@ class RegistryCompatibilityTests(unittest.TestCase):
                 registry.close()
                 library.close()
 
-    def test_failed_reconfiguration_keeps_the_working_governor(self) -> None:
+    def test_failed_reconfiguration_leaves_registered_governor_usable(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             library = LibraryOfContext(
                 os.path.join(directory, "library.sqlite"),
@@ -116,7 +116,7 @@ class RegistryCompatibilityTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     registry.get({**settings, "token_budget": 128})
                 self.assertIs(registry.get(settings), governor)
-                governor.prepare("The existing governor still accepts a turn.")
+                governor.prepare("The governor accepts a turn.")
             finally:
                 registry.close()
                 library.close()

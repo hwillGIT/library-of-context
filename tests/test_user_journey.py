@@ -90,7 +90,7 @@ class NormalUserCLITests(unittest.TestCase):
 
 
 class ProcessRestartAcceptanceTests(unittest.TestCase):
-    def test_governed_thread_recovers_in_a_new_process(self) -> None:
+    def test_governed_thread_recovers_across_process_restart(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             database = Path(directory) / "library.sqlite"
             record_script = textwrap.dedent(
@@ -134,7 +134,9 @@ class ProcessRestartAcceptanceTests(unittest.TestCase):
                             event_id="user-2",
                         )
                         if not context.flush(timeout=5):
-                            raise RuntimeError("new work did not become searchable")
+                            raise RuntimeError(
+                                "post-restart event did not become searchable"
+                            )
                         print(json.dumps({
                             "messages": prompt.messages,
                             "token_count": prompt.token_count,
@@ -224,7 +226,7 @@ class ExistingAgentIntegrationTests(unittest.TestCase):
                         library.store.count_thread_events("default", "retry"), 2
                     )
 
-    def test_projects_and_agent_threads_remain_isolated(self) -> None:
+    def test_projects_and_agent_threads_are_isolated(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             with LibraryOfContext(
                 Path(directory) / "library.sqlite", redis_url=""

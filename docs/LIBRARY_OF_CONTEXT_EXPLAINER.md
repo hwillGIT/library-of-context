@@ -122,9 +122,9 @@ wsl -d Ubuntu -- redis-cli ping
 python -m library_of_context doctor
 ```
 
-This setup requires neither Docker nor a cloud account. A managed Redis endpoint can be
-used later by changing `LIBRARY_OF_CONTEXT_REDIS_URL`; private context would then cross
-the local-machine boundary and should be protected with an authenticated TLS proxy or a
+This setup requires neither Docker nor a cloud account. To use a managed Redis endpoint,
+set `LIBRARY_OF_CONTEXT_REDIS_URL`. This configuration sends private context across the
+local-machine boundary, so protect the connection with an authenticated TLS proxy or a
 client that supports `rediss://`.
 
 ## Agent integration
@@ -153,7 +153,7 @@ prepare and durably record → build bounded prompt → call model
 ## What the system does—and does not—expand
 
 It expands **addressable context** into RAM and disk. It does not alter the physical
-context-window limit of a hosted model. Retrieval quality still matters: a book that is
+context-window limit of a hosted model. Retrieval quality matters: a book that is
 poorly chunked, mislabeled, or unrelated to the query may stay on the shelf. The hard
 budget protects prompt size even when retrieval returns too much.
 

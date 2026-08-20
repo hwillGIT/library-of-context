@@ -151,7 +151,7 @@ TOOLS = [
     ),
     _tool(
         "library_desk_watch",
-        "Refresh a reading desk now and periodically thereafter for a long-running task. A later focus change should call library_desk_refresh or start this tool again.",
+        "Refresh a reading desk immediately and periodically thereafter for a long-running task. A later focus change should call library_desk_refresh or start this tool again.",
         _object_schema(
             {
                 "subject": {"type": "string", "minLength": 1},

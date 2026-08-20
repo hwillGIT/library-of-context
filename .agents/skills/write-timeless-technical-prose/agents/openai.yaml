@@ -1,0 +1,4 @@
+interface:
+  display_name: "Timeless Technical Prose"
+  short_description: "Write timeless, non-historical technical prose"
+  default_prompt: "Use $write-timeless-technical-prose to edit these materials into one coherent technical present."

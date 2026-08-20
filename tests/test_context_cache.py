@@ -19,7 +19,7 @@ from context_cache import (
 from context_cache.models import ContextRecord, SearchHit, WorkingSet
 from context_cache.redis_hot import RedisHotCache
 from context_cache.server import create_server
-from library_of_context import LibraryOfContext as BrandedLibrary
+from library_of_context import LibraryOfContext as PublicLibraryOfContext
 
 
 class _FakeRedisHandler(socketserver.StreamRequestHandler):
@@ -212,8 +212,8 @@ class ContextCacheTests(unittest.TestCase):
         self.assertIn("book-1", working.swapped_in)
         desk.close()
 
-    def test_branded_package_reexports_library(self) -> None:
-        self.assertIs(BrandedLibrary, LibraryOfContext)
+    def test_public_package_exports_library_class(self) -> None:
+        self.assertIs(PublicLibraryOfContext, LibraryOfContext)
 
     def test_local_http_api(self) -> None:
         server, swapper = create_server(self.cache, "127.0.0.1", 0)

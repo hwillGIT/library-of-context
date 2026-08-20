@@ -42,17 +42,17 @@ class CLIParserTests(unittest.TestCase):
                 args = parser.parse_args(argv)
                 self.assertEqual(args.command_handler, expected)
 
-    def test_branded_environment_variables_take_precedence(self) -> None:
+    def test_library_environment_variables_take_precedence_over_aliases(self) -> None:
         environment = {
-            "LIBRARY_OF_CONTEXT_DB": "branded.sqlite",
-            "CONTEXT_CACHE_DB": "legacy.sqlite",
-            "LIBRARY_OF_CONTEXT_REDIS_URL": "redis://branded:6379/2",
-            "CONTEXT_CACHE_REDIS_URL": "redis://legacy:6379/1",
+            "LIBRARY_OF_CONTEXT_DB": "library.sqlite",
+            "CONTEXT_CACHE_DB": "alias.sqlite",
+            "LIBRARY_OF_CONTEXT_REDIS_URL": "redis://library:6379/2",
+            "CONTEXT_CACHE_REDIS_URL": "redis://alias:6379/1",
         }
         with patch.dict(os.environ, environment, clear=False):
             args = build_parser().parse_args(["stats"])
-        self.assertEqual(args.db, "branded.sqlite")
-        self.assertEqual(args.redis_url, "redis://branded:6379/2")
+        self.assertEqual(args.db, "library.sqlite")
+        self.assertEqual(args.redis_url, "redis://library:6379/2")
 
 
 class CLIConfigurationTests(unittest.TestCase):
@@ -82,7 +82,7 @@ class CLIConfigurationTests(unittest.TestCase):
 
 
 class CLICommandTests(unittest.TestCase):
-    def test_aliases_keep_existing_json_outputs(self) -> None:
+    def test_command_aliases_emit_canonical_json_payloads(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             database = Path(directory) / "library.sqlite"
             common = ["--db", str(database), "--no-redis"]

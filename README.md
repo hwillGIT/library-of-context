@@ -3,7 +3,6 @@
 [![CI](https://github.com/hwillGIT/library-of-context/actions/workflows/test.yml/badge.svg)](https://github.com/hwillGIT/library-of-context/actions/workflows/test.yml)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](ROADMAP.md)
 [![Local first](https://img.shields.io/badge/architecture-local--first-2ea44f.svg)](ARCHITECTURE.md)
 
 **Virtual memory for AI context: durable outside the model, bounded inside it.**
@@ -21,8 +20,9 @@ task. Changing the task replaces the desk; it does not pile more books on top.
 
 > [!IMPORTANT]
 > This project expands **addressable context**, not a model's physical context-window
-> limit. It is an experimental alpha: useful for local prototypes and collaboration,
-> but not yet a production multi-tenant memory service.
+> limit. It is intended for local prototypes and collaboration, not as a production
+> multi-tenant memory service. See [Capability Status](docs/STATUS.md) for explicit
+> support boundaries.
 
 ## Why this is different from ordinary compaction
 
@@ -38,7 +38,7 @@ Library:      durable event log -> bounded recent/protected context
                        +-----------> fresh model request on every turn
 ```
 
-Original events remain inspectable and recoverable. Summaries may become navigation
+Original events are inspectable and recoverable. Summaries may become navigation
 aids, but they do not need to be the only surviving copy.
 
 The [related-work landscape](docs/RELATED_WORK.md) compares this design with model
@@ -47,7 +47,7 @@ checkpointing, and inference-runtime paging. Here, “compaction” means a smal
 potentially lossy continuation representation whose originals are not independently
 addressable unless another layer retains them.
 
-## What is implemented
+## Capabilities
 
 - A **context governor** with `prepare -> model call -> commit` lifecycle operations.
 - Durable SQLite thread events and a transactional indexing outbox.
@@ -137,8 +137,8 @@ Continue with the [installation guide](docs/GETTING_STARTED.md).
 | Closed host with no MCP and no model-call hooks | No transparent integration |
 
 See [Add the Library to your agent](docs/ADD_TO_YOUR_AGENT.md) for Codex, Python, and HTTP
-configuration examples. A newly configured MCP server requires a client restart or new
-session; it cannot be injected into a chat already in progress.
+configuration examples. After MCP server configuration, restart the client or begin a
+separate session; configuration does not affect a chat already in progress.
 
 ### Run an automatically governed Python text agent
 
@@ -205,9 +205,9 @@ Custom MCP gateways that own the model-call boundary can use:
 | `library_context_status` | Inspect watermarks, queue pressure, and worker health |
 | `library_context_flush` | Wait for indexing to reach the recorded watermark |
 
-Traditional shelving, retrieval, reading-desk, and stateless-session tools remain
-available. Do not enable the gateway-only tools in a host that cannot send their
-returned `messages` as the complete next model request.
+The Library exposes shelving, retrieval, reading-desk, stateless-session, and governor
+tools. Enable gateway-only tools only in a host that sends the returned `messages` as
+the complete next model request.
 
 ## Local HTTP API
 
@@ -226,7 +226,7 @@ The governor endpoints are:
 | `POST` | `/context/flush` | Wait for asynchronous index visibility |
 | `GET` | `/context/status/{session}` | Inspect governor state and watermarks |
 
-The existing `/books`, `/library/ingest`, `/catalog/query`, and `/desk/*` routes expose
+The `/books`, `/library/ingest`, `/catalog/query`, and `/desk/*` routes expose
 the lower-level library. The server binds to loopback and has no authentication. Do not
 expose it directly to another machine.
 
@@ -234,7 +234,7 @@ expose it directly to another machine.
 
 1. **Recent ring:** per-thread ordered events, bounded by event count and an estimated-
    token target. One oversized event may remain resident so fresh context is visible;
-   prompt assembly still truncates its model-visible view to the hard envelope budget.
+   prompt assembly truncates its model-visible view to the hard envelope budget.
    This is not an LRU; conversation order matters.
 2. **Process RAM:** byte-bounded LRU for hot books and retrieval results.
 3. **Local Redis:** optional shared cache for hot books, queries, desks, TTLs, and
@@ -259,24 +259,17 @@ example above creates `data/redis-check.sqlite`.
 
 Use `--no-redis` everywhere if SQLite plus process RAM is sufficient.
 
-## Performance status
+## Performance limits
 
-The bounded prompt and event/outbox path work. The FTS candidate join that previously
-caused near-quadratic common-term behavior has been removed. Vector retrieval still
-exact-scores every live record in a namespace, so large catalogs require an ANN adapter
-before production-scale claims are justified.
+Prompt assembly is bounded, and recorded events use a transactional outbox. FTS returns
+a bounded candidate set, while vector retrieval exact-scores every live record in a
+namespace. Large-catalog scale claims therefore require measured evidence and, when the
+exact path crosses a declared limit, a bounded vector-search adapter.
 
-Current priorities include bounded candidate generation, model-accurate tokenization,
-batch embeddings, a single workstation daemon, ACL-aware scope routing, and a durable
-selective team-promotion plane. Measurements, proposed SLOs, and benchmark questions are
-in [Performance and Scaling](docs/PERFORMANCE_AND_SCALING.md).
-
-These priorities are conditional, not a requirement to install every subsystem. Exact
-search may be best for a small catalog; an embedded process may be best for one agent;
-Redis may add no value after daemon consolidation; and a broker or cloud plane belongs
-only in a real multi-node team workload. [Why These Improvements?](docs/WHY_THE_ROADMAP.md)
-explains the case for and against each change, alternatives, adoption triggers, and
-evidence gates.
+[Performance and Scaling](docs/PERFORMANCE_AND_SCALING.md) defines measurements, SLO
+criteria, and benchmark questions. [Why These Improvements?](docs/WHY_THE_ROADMAP.md)
+compares simpler alternatives, adoption triggers, and evidence gates, while the
+[Roadmap](ROADMAP.md) sequences conditional work.
 
 ## Documentation
 

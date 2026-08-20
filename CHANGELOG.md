@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes will be documented here. The project follows semantic versioning
+This changelog records notable project changes. The project follows semantic versioning
 once stable release guarantees are established.
 
 ## [Unreleased]
@@ -17,12 +17,12 @@ once stable release guarantees are established.
 
 ### Changed
 
-- The Codex MCP template is now project-isolated, virtual-environment-safe,
+- The Codex MCP template is project-isolated, virtual-environment-safe,
   Redis-optional by default, and limited to tools a cooperative host can use correctly.
-- HTTP context status now honors a non-default collection query.
+- HTTP context status honors a non-default collection query.
 - CLI, HTTP, MCP, prompt assembly, indexing, retrieval, queue, and token-budget
-  responsibilities now have separate modules with compatibility tests.
-- Query-cache identity now includes the ranker version, ranking policy, and stable
+  responsibilities have separate modules with compatibility tests.
+- Query-cache identity includes the ranker version, ranking policy, and stable
   embedder configuration.
 
 ## [0.3.0] - 2026-08-20

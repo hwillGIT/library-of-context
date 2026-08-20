@@ -70,7 +70,7 @@ def _record(
 
 
 class RetrievalRankingTests(unittest.TestCase):
-    def test_pure_ranking_preserves_the_hybrid_score(self) -> None:
+    def test_rank_records_computes_the_hybrid_score(self) -> None:
         now = 20 * 86400.0
         aligned = _record(
             "aligned",
@@ -115,7 +115,7 @@ class RetrievalRankingTests(unittest.TestCase):
         self.assertAlmostEqual(hits[0].score, expected_score)
         self.assertEqual(aligned.accessed_at, now - 2 * 86400.0)
 
-    def test_filters_threshold_and_tie_breaking_remain_stable(self) -> None:
+    def test_filters_threshold_and_updated_at_tie_breaking(self) -> None:
         older = _record(
             "older",
             embedding=[1.0],
@@ -164,7 +164,7 @@ class RetrievalRankingTests(unittest.TestCase):
 
 
 class RetrievalCacheTests(unittest.TestCase):
-    def test_public_retrieve_signature_is_unchanged(self) -> None:
+    def test_public_retrieve_signature_matches_contract(self) -> None:
         parameters = inspect.signature(ContextCache.retrieve).parameters
         self.assertEqual(
             list(parameters),

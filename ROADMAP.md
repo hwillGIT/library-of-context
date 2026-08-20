@@ -9,7 +9,7 @@ catalog cardinality and concurrent local agents. Milestone 4 is context-quality
 research. Milestone 5 exists only for teams that need cross-workstation knowledge.
 
 Read [Why These Improvements?](docs/WHY_THE_ROADMAP.md) for the affirmative case,
-skeptical case, alternatives, adoption triggers, and evidence gates. New substantial
+skeptical case, alternatives, adoption triggers, and evidence gates. Substantial
 proposals should use the [decision brief template](docs/DECISION_BRIEF_TEMPLATE.md).
 The [related-work landscape](docs/RELATED_WORK.md) supplies comparative evidence;
 inclusion there is neither adoption nor a roadmap commitment.
@@ -32,7 +32,7 @@ inclusion there is neither adoption nor a roadmap commitment.
 - Define agent-thread retrieval datasets and expected evidence.
 - Add tokenizer adapters and enforce actual model-token budgets.
 - Complete cache-key identity and index-version tracking.
-- Push metadata and future ACL predicates into candidate generation.
+- Push metadata and ACL predicates into candidate generation.
 - Add structured metrics for latency, candidates, queue age, lag, RSS, and disk.
 
 **Why:** without comparable measurements, a faster retriever may quietly lose important
@@ -54,7 +54,7 @@ adversarial token cases, low-cardinality metrics, and scheduled scale suites.
 - Batch embeddings by token count and use pooled connections.
 - Publish immutable source versions atomically.
 
-**Why:** exact vector scoring still grows with the namespace, redundant candidates waste
+**Why:** exact vector scoring grows with the namespace, redundant candidates waste
 the desk, and per-item embedding work accumulates round trips. Bounded candidates and
 atomic editions address measured work and visibility problems.
 
@@ -82,7 +82,7 @@ connections. One owner can enforce fair queues, quotas, health, and recovery.
 
 **Why not automatically:** a daemon adds installation, supervision, IPC compatibility,
 local authentication, upgrades, and a workstation failure boundary. Embedded mode is
-the simpler and better design for one small process.
+the simpler design for one small process.
 
 **Adoption trigger:** measured duplicate work, aggregate cache memory, thread count,
 SQLite contention, or queue age breaks the declared multi-agent workstation profile.
@@ -109,8 +109,9 @@ stale state. Derived context must remain versioned, explainable, and linked to o
 **Adoption trigger:** curated long-thread evaluations demonstrate continuity, branch, or
 scope failures that simpler recent/protected/retrieved paging does not solve.
 
-**Exit gate:** agent-thread evaluations demonstrate improved continuity without hidden
-instruction or stale-context regressions.
+**Exit gate:** agent-thread evaluations demonstrate higher continuity scores than basic
+recent/protected/retrieved paging without hidden-instruction or stale-context
+regressions.
 
 ## Milestone 5 — selective team memory
 
@@ -126,8 +127,8 @@ authorization, replay, deletion, and offline recovery.
 
 **Why not automatically:** synchronizing raw threads expands privacy and compliance
 scope. A broker transports events but does not define promotion, identity, conflicts, or
-revocation. A small team may be better served first by reviewed cards and a simple
-authenticated database sync API.
+revocation. Reviewed cards and a simple authenticated database sync API may satisfy a
+small team's requirements.
 
 **Adoption trigger:** multiple principals need approved knowledge across independently
 failing devices. Authorization is mandatory before shared retrieval; a broker is added

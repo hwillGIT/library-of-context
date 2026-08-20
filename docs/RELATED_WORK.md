@@ -1,37 +1,24 @@
-# Related Work and Design Landscape
+# Context Management: Related Systems and Boundaries
 
-This review maps the Library of Context to research and current implementation work
-in long-context models, retrieval, prompt compression, agent memory, provider
-compaction, and inference-runtime paging. It was reviewed on **20 August 2026**.
+“Context management” describes several mechanisms that operate on different state and
+at different layers of a model-serving system. A larger model window, a KV cache, a
+compressed prompt, a retrieval index, an agent memory store, and a context governor
+solve different problems. Their guarantees are not interchangeable.
 
-The documents have separate roles:
+The comparison uses primary sources: proceedings papers, author preprints, normative
+API documentation, and official project repositories. Mutable documentation includes
+an access date, and preprints are identified as preprints. Performance results from
+different datasets, models, or hardware are not compared directly.
 
-- [Capability Status](STATUS.md) is the authority for what is implemented.
-- [Architecture](architecture.md) defines current invariants and boundaries.
-- [Why These Improvements?](WHY_THE_ROADMAP.md) records alternatives, costs,
-  adoption triggers, and evidence gates.
-- [Roadmap](roadmap.md) orders planned and research work.
-- This document supplies comparative evidence. Inclusion is not an endorsement or a
-  commitment to adopt a method.
+Each cited mechanism is followed by the system boundary that separates or connects it
+to the Library. These boundary statements describe this project's architecture rather
+than claims made by the cited authors.
 
-## Method
+Project specifications: [capability status](STATUS.md),
+[architecture](architecture.md), [design rationale](WHY_THE_ROADMAP.md),
+[roadmap](roadmap.md), and [decision criteria](DECISION_BRIEF_TEMPLATE.md).
 
-The review uses primary sources: proceedings papers, author preprints, normative API
-documentation, and official project repositories. Mutable documentation is marked
-with an access date. Performance numbers are not compared across different datasets,
-models, or hardware. A missing feature is not inferred merely because one source does
-not mention it.
-
-Each section separates two kinds of statement:
-
-- **Source-backed observation:** what the cited work describes or evaluates.
-- **Library interpretation:** what that evidence implies for this project. These
-  interpretations are design judgments, not claims made by the cited authors.
-
-Recent preprints are useful design evidence but are not treated as established
-results. They are labelled accordingly.
-
-## Terms that should not be conflated
+## Mechanisms and system boundaries
 
 | Term | Meaning in this project |
 |---|---|
@@ -49,114 +36,113 @@ increase the physical model window, modify attention, or manage inference tensor
 
 ![Context-management research landscape](context-management-landscape.png)
 
-*The same memory vocabulary is used for mechanisms at different system boundaries.*
+*Similar memory terms refer to different state and intervention boundaries.*
 
-## Current Library baseline
+## Library system boundary
 
-Version 0.3 implements an authoritative SQLite event log and transactional outbox,
-bounded recent and work rings, protected context, exact hybrid retrieval, watermarks,
-and a `prepare -> model -> commit` lifecycle for text calls. RAM and optional Redis are
-disposable accelerators. Ordinary MCP use is cooperative; automatic prompt governance
-requires an application or gateway that owns the model-call boundary.
+The Library operates between an application and a model call. It records each governed
+event in an authoritative SQLite log before the event can leave the model-visible
+working set. Protected events, a bounded recent FIFO ring, and retrieved source records
+form a fresh bounded request. Derived indexes, RAM entries, and optional Redis entries
+can be rebuilt or discarded without losing the event history.
 
-Model-accurate tokenization, local approximate nearest-neighbor search, a shared
-workstation daemon, scope routing, automatic summaries, branch semantics, and team
-sync are not current baseline features. Their exact status is maintained in
-[Capability Status](STATUS.md).
+Automatic governance requires an application or gateway that controls the complete
+model request. MCP-only use is cooperative because an MCP server cannot replace a
+closed host's transcript or internal compaction state. The Library does not alter model
+architecture, allocate KV-cache pages, or increase the model's physical token window.
 
 ## Model-internal long-context memory
 
 ### Recurrent and compressed model state
 
-**Source-backed observation.** Transformer-XL carries hidden state between segments,
+**Evidence.** Transformer-XL carries hidden state between segments,
 while Compressive Transformer retains compressed older activations.[^transformer-xl]
 [^compressive-transformer] Recurrent Memory Transformer carries learned memory tokens
 between segments.[^rmt] Infini-attention combines local attention with a compressive
 memory inside the attention mechanism.[^infini-attention] These methods change model
 architecture, training, or inference behavior.
 
-**Library interpretation.** These methods can increase effective sequence reach for a
+**System boundary.** These methods can increase effective sequence reach for a
 controlled model. They do not provide a provider-neutral, inspectable store of agent
-events. The Library should remain compatible with them, but its durable records,
+events. The Library must interoperate with them, while its durable records,
 provenance, deletion, and retrieval policy belong outside the model.
 
 ### Sliding windows and streaming inference
 
-**Source-backed observation.** StreamingLLM retains attention-sink tokens and a recent
+**Evidence.** StreamingLLM retains attention-sink tokens and a recent
 sliding window to support stable streaming generation beyond the model's training
 length.[^streamingllm]
 
-**Library interpretation.** A recent FIFO ring serves a related boundedness objective
+**System boundary.** A recent FIFO ring serves a related boundedness objective
 at the application level, but the mechanisms are different. A sliding KV cache does
-not recover the semantic content of discarded events. Older information still needs
+not recover the semantic content of discarded events. Older information requires
 an external source and a selection policy.
 
 ## Retrieval and external memory
 
 ### Retrieval-augmented generation
 
-**Source-backed observation.** Retrieval-Augmented Generation combines a parametric
+**Evidence.** Retrieval-Augmented Generation combines a parametric
 generator with an external dense document index.[^rag] RETRO retrieves neighboring
 chunks from a large corpus through a model architecture trained to use them.[^retro]
 Self-RAG trains a model to decide when to retrieve and to assess retrieved evidence.[^self-rag]
 RAPTOR builds a hierarchy of clustered source text and abstractive summaries for
 retrieval at several levels.[^raptor]
 
-**Library interpretation.** These works establish retrieval as a way to keep useful
+**System boundary.** These works establish retrieval as a way to keep useful
 information outside the active request. Agent threads add requirements that document
 retrieval alone does not settle: immediate visibility of new events, ordering,
 supersession, protected instructions, idempotent replay, and strict prompt budgets.
 Hierarchical summaries may be useful navigation records, but their source events must
-remain addressable.
+be addressable.
 
 ### Long-term model memory
 
-**Source-backed observation.** Memorizing Transformers use approximate nearest-neighbor
+**Evidence.** Memorizing Transformers use approximate nearest-neighbor
 lookup over stored key/value pairs from prior batches.[^memorizing-transformers]
 LongMem separates a frozen language-model backbone from a trained memory side network
 that retrieves older context.[^longmem]
 
-**Library interpretation.** Both works support separating an active model from a
+**System boundary.** Both works support separating an active model from a
 larger memory. Their learned or latent representations are not suitable as the sole
-authoritative record for this project. Embeddings and indexes should remain versioned,
+authoritative record for this project. Embeddings and indexes must be versioned,
 rebuildable derivatives of durable text and metadata.
 
 ## Agent memory and active context management
 
 ### Explicit memory tiers and reflective memory
 
-**Source-backed observation.** Generative Agents retrieve observations using recency,
+**Evidence.** Generative Agents retrieve observations using recency,
 importance, and relevance, then create higher-level reflections for planning.[^generative-agents]
 MemoryBank combines stored conversation, summarization, retrieval, and a heuristic
 forgetting and reinforcement policy.[^memorybank] MemGPT presents an operating-system
 analogy with tiered memory, interrupts, and model-directed movement between working
 and external context.[^memgpt]
 
-**Library interpretation.** MemGPT is the nearest research precedent for the Library's
+**System boundary.** MemGPT is the nearest research precedent for the Library's
 virtual-memory metaphor. The Library differs in emphasis: an event is durable before
 it becomes evictable; the recent and work rings are explicitly bounded; and summaries
 are derived records rather than the only surviving continuation state. Reflection and
-forgetting policies remain research topics because they can preserve errors or remove
+forgetting policies are research topics because they can preserve errors or remove
 details that later become important.
 
 ### Temporal and graph memory
 
-**Source-backed observation.** The Zep paper and its Graphiti implementation represent
+**Evidence.** The Zep paper and its Graphiti implementation represent
 episodes, entities, and temporally qualified relationships in an incrementally updated
 knowledge graph.[^zep-paper][^graphiti] Mem0 extracts and consolidates selected memories
 and supports vector and graph-backed retrieval through its documented memory
 pipeline.[^mem0-paper][^mem0-docs]
 
-**Library interpretation.** Temporal graphs may improve retrieval of changing facts,
-relationships, and supersession. Extracted facts are still derived state. They should
+**System boundary.** Temporal graphs may improve retrieval of changing facts,
+relationships, and supersession. Extracted facts are derived state. They should
 retain provenance to original records and should not silently replace the thread log.
 Graph storage also adds schema, consistency, and operational costs that need measured
 benefit before adoption.
 
-### Recent active-context research
+### Agent-directed context operations
 
-Several current proposals treat memory management as an agent action or learned
-policy:
+Several systems expose memory management as an agent action or learned policy:
 
 - **Sculptor** gives an agent tools for context fragmentation, summarization, hiding,
   restoration, and search.[^sculptor]
@@ -168,25 +154,22 @@ policy:
 - **MemOS** proposes a memory operating-system abstraction spanning plaintext,
   activation, and parametric memory.[^memos]
 
-These are recent papers or preprints. Their policies and evaluations should be
-reproduced before they influence a default Library policy.
-
-**Library interpretation.** Explicit operations such as protect, release, retrieve,
+**System boundary.** Explicit operations such as protect, release, retrieve,
 and derive fit the Library's control surface. A learned policy must not control
 durability, authorization, or irreversible deletion. It may propose a working set or
-summary if the result remains explainable, bounded, and linked to source records.
+summary if the result is explainable, bounded, and linked to source records.
 
 ## Prompt compression and compaction
 
 ### Query-aware and learned compression
 
-**Source-backed observation.** LLMLingua removes lower-value prompt tokens under a
+**Evidence.** LLMLingua removes lower-value prompt tokens under a
 budget.[^llmlingua] LongLLMLingua adds query-aware compression and document
 reordering.[^longllmlingua] Gist tokens and AutoCompressors encode prompts or previous
 segments into compact learned representations.[^gist-tokens][^autocompressors]
 RECOMP trains extractive and abstractive compressors for retrieved documents.[^recomp]
 
-**Library interpretation.** Compression can be a final packing operation after
+**System boundary.** Compression can be a final packing operation after
 retrieval. It is often query-specific or lossy, so it cannot replace the durable event
 store. Exact instructions, identifiers, decisions, and cited evidence require explicit
 protection or a lossless representation. Any compressor needs task-quality tests and a
@@ -194,51 +177,49 @@ model-specific token budget.
 
 ### Provider-native continuation management
 
-**Source-backed observation.** The OpenAI Responses API provides a compact operation
+**Evidence.** The OpenAI Responses API provides a compact operation
 that returns a compacted response representation for later continuation.[^openai-compact]
 Anthropic documents server-side compaction and context editing that can summarize
 older conversation or clear selected tool and thinking blocks.[^anthropic-compaction]
-[^anthropic-context-editing] These are mutable product interfaces; the cited pages
-were accessed on 20 August 2026.
+[^anthropic-context-editing]
 
-**Library interpretation.** Provider compaction can reduce the active provider history
+**System boundary.** Provider compaction can reduce the active provider history
 when the application uses that provider's continuation protocol. It is not the same as
 an application-owned, inspectable, semantically searchable backing store. The Library
 can coexist with provider compaction, but a gateway must define which layer owns
 history and must avoid sending both a governed envelope and an accumulated transcript.
 The project has no native hook that replaces a closed host's internal compaction.
 
-## Current implementation frameworks
+## Framework integration surfaces
 
-The following sources describe current project behavior; they do not provide
-independent comparative performance evidence. Documentation and repositories were
-accessed on 20 August 2026.
+Agent frameworks expose different combinations of session storage, retrieval hooks,
+history reduction, workflow checkpoints, and pre-request or post-response middleware.
+These mechanisms determine where a context governor can intervene.
 
-| Project | Documented context or memory mechanism | Relationship to this project |
+| Project | Documented context or memory mechanism | Relevant boundary or mechanism |
 |---|---|---|
 | [Letta](https://github.com/letta-ai/skills/blob/main/letta/letta-api-client/memory-architecture.md) | In-context core blocks plus out-of-context archival and conversation search; agent messages can be compacted | Similar tiered-memory model; useful reference for explicit memory operations and agent-facing controls |
-| [LangGraph](https://docs.langchain.com/oss/python/langgraph/persistence) and [LangChain memory](https://docs.langchain.com/oss/python/concepts/memory) | Thread checkpoints and namespaced cross-thread stores; trimming and summarization are application patterns | A possible orchestration and persistence integration surface; context ownership and paging policy remain application-defined |
+| [LangGraph](https://docs.langchain.com/oss/python/langgraph/persistence) and [LangChain memory](https://docs.langchain.com/oss/python/concepts/memory) | Thread checkpoints and namespaced cross-thread stores; trimming and summarization are application patterns | A possible orchestration and persistence integration surface; context ownership and paging policy are application-defined |
 | [LlamaIndex Memory](https://github.com/run-llama/llama_index/blob/main/docs/src/content/docs/framework/module_guides/deploying/agents/memory.mdx) | Token-bounded FIFO short-term memory can flush older messages into configurable long-term memory blocks | A concrete reference for short-term to long-term movement and budgeted retrieval |
-| [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/journey/adding-context-providers) | Sessions and context providers can inject state before and after invocation; separate APIs provide compaction and workflow checkpoints | A current host integration target for a Library context provider; not itself evidence for a semantic paging policy |
+| [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/journey/adding-context-providers) | Sessions and context providers can inject state before and after invocation; separate APIs provide compaction and workflow checkpoints | Context-provider hooks can host the Library lifecycle; the framework does not define the semantic paging policy |
 | [OpenAI Agents SDK](https://github.com/openai/openai-agents-python/blob/main/docs/sessions/index.md) | Session backends persist conversation history; a Responses compaction session can rewrite stored continuation state | A session and compaction integration reference; semantic retrieval needs an additional policy and index |
 | [Graphiti](https://github.com/getzep/graphiti) | Incremental temporal knowledge graph with semantic, lexical, and graph retrieval | A candidate derived temporal index; it does not replace the authoritative event log |
-| [Mem0](https://github.com/mem0ai/mem0/blob/main/docs/core-concepts/how-it-works.mdx) | Extracts, updates, stores, and searches selected memories across documented scopes | A reference for memory extraction and consolidation; the caller still decides how results enter the prompt |
-| [AutoGen](https://github.com/microsoft/autogen) | Memory interfaces inject retrieved content and model-context classes truncate by message or token count | Official repository is in maintenance mode and directs new users to Microsoft Agent Framework |
-| [Semantic Kernel](https://learn.microsoft.com/en-us/semantic-kernel/concepts/ai-services/chat-completion/chat-history) | Chat-history reducers truncate or summarize history; vector stores are a separate facility | A reference for reducers and adapter boundaries; current repository guidance also points agent work to Microsoft Agent Framework |
+| [Mem0](https://github.com/mem0ai/mem0/blob/main/docs/core-concepts/how-it-works.mdx) | Extracts, updates, stores, and searches selected memories across documented scopes | A reference for memory extraction and consolidation; the caller decides how results enter the prompt |
+| [AutoGen](https://github.com/microsoft/autogen) | Memory interfaces inject retrieved content and model-context classes truncate by message or token count | Memory injection and bounded model contexts are available; semantic page-in is application-defined |
+| [Semantic Kernel](https://learn.microsoft.com/en-us/semantic-kernel/concepts/ai-services/chat-completion/chat-history) | Chat-history reducers truncate or summarize history; vector stores are a separate facility | Reducers and vector retrieval occupy separate integration boundaries |
 
-The comparison does not imply that the Library must wrap every framework. A maintained
-adapter needs an owner, a stable pre-request and post-response lifecycle, retry and
-stream semantics, and conformance tests proving that the host does not append an
-additional transcript.
+A framework adapter requires an owner, a stable pre-request and post-response lifecycle,
+defined retry and stream semantics, and conformance tests proving that the host does
+not append an additional transcript.
 
 ## Inference-runtime paging and caching
 
-**Source-backed observation.** PagedAttention applies operating-system virtual-memory
+**Evidence.** PagedAttention applies operating-system virtual-memory
 ideas to allocation and sharing of inference-time KV-cache blocks.[^pagedattention]
 Prefix and prompt caches reuse computation for repeated token prefixes; they do not
 select facts from a durable agent history.
 
-**Library interpretation.** PagedAttention and Library semantic paging share a
+**System boundary.** PagedAttention and Library semantic paging share a
 metaphor, not a storage layer. Runtime KV pages are model activations and may be
 discarded. Library books are application records with provenance and lifecycle rules.
 The two mechanisms can operate together without one replacing the other.
@@ -272,33 +253,35 @@ stale indexes, token-bound enforcement, and local operation during dependency fa
 | Document RAG | Retrieved corpus passages | Before a model request | Agent-event ordering, protected state, and read-your-own-write behavior |
 | Library semantic paging | Durable events plus derived indexes and policy-selected records | Application-owned model-call boundary | A larger native window or automatic control of a closed host |
 
-## Design implications
+## System design constraints
 
-![Research synthesis for the Library of Context](research-synthesis.png)
+![Context pipeline and authority boundaries](research-synthesis.png)
 
-*Durable originals remain authoritative; retrieval structures and model working sets
-remain replaceable.*
+*Durable originals are authoritative; retrieval structures and model working sets are
+replaceable.*
 
-### Adopted in the current architecture
+### Authority rules
 
-- Keep original events authoritative and treat summaries, embeddings, and graphs as
+- Original events are authoritative; summaries, embeddings, and graphs are
   rebuildable derivatives.
-- Combine a bounded recent FIFO ring with retrieval of older records.
-- Make selected instructions and decisions explicitly protectable.
-- Separate durable outbox recovery from bounded ring dispatch.
-- Report recorded and indexed watermarks so freshness is observable.
-- Keep provider, Redis, and team services outside the local prompt requirement.
+- A bounded recent FIFO ring supplies fresh events while retrieval selects older
+  records.
+- Selected instructions and decisions can be protected explicitly.
+- The durable outbox provides recovery; the bounded ring provides dispatch.
+- Recorded and indexed watermarks expose freshness.
+- Provider, Redis, and team services are outside the local prompt requirement.
 
-### Planned or scale-triggered
+### Conditional mechanisms
 
-- Add model-accurate tokenizers before advertising a hard provider-token bound.
-- Add bounded vector candidates or approximate nearest-neighbor search only after
-  exact retrieval crosses a measured latency or memory threshold.
-- Evaluate hierarchical summaries and temporal indexes as derived views with source
-  links, versioning, and contradiction tests.
-- Build adapters only where a framework exposes a stable model-call boundary.
+- A hard provider-token guarantee requires a model-accurate tokenizer and allowance
+  for provider framing.
+- Bounded vector candidates or approximate nearest-neighbor search are justified when
+  exact retrieval crosses a declared latency or memory threshold.
+- Hierarchical summaries and temporal indexes qualify as derived views only when they
+  retain source links, version identity, and contradiction handling.
+- A framework adapter requires a stable model-call boundary.
 
-### Deliberately excluded from the authority boundary
+### Authority constraints
 
 - Learned summaries, latent vectors, or graph facts as the only surviving record.
 - Redis, a vector index, or a remote service as the sole source of truth.
@@ -306,25 +289,21 @@ remain replaceable.*
 - Claims that MCP can replace undocumented native compaction behavior.
 - Cloud availability as a prerequisite for a local governed prompt.
 
-## Open evidence gaps
+## Unresolved technical questions
 
-The related work narrows several repository questions but does not decide them:
+The system requires evidence for the following decisions:
 
 1. Which agent-thread corpus measures retrieval, supersession, contradictions, and
    genuine misses without exposing private production traces?
 2. When do derived capsules improve continuity compared with direct source retrieval,
    and how should their errors be shown to users?
-3. Which local vector index preserves sufficient recall under metadata and future ACL
+3. Which local vector index preserves sufficient recall under metadata and access-control
    filters on Windows, macOS, and Linux?
 4. Which intervention adapters can preserve structured tool calls, streaming aborts,
    retries, and branches without sending duplicate history?
 5. How should provider compaction and Library paging compose when both are enabled?
 6. What policy protects critical state without allowing protected-context growth to
    defeat the bounded envelope?
-
-Contributions should connect a proposed change to a named workload, baseline, simpler
-alternative, failure mode, and acceptance evidence. See the
-[decision brief template](DECISION_BRIEF_TEMPLATE.md).
 
 ## Primary references
 

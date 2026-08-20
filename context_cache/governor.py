@@ -22,7 +22,7 @@ _ROLES = {"system", "developer", "user", "assistant", "tool"}
 class LibraryContextGovernor:
     """Own the durable record -> bounded prompt -> durable response lifecycle.
 
-    The model receives a newly assembled prompt on every call. Full thread events stay
+    The model receives a bounded prompt assembled for every call. Full thread events stay
     in SQLite, recent events remain immediately visible through an in-memory overlay,
     and a bounded work ring indexes durable outbox events asynchronously.
     """

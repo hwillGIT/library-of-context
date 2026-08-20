@@ -155,7 +155,7 @@ def _load(value: bytes) -> Any:
 
 
 class RedisHotCache:
-    """Disposable shared RAM tier. SQLite remains authoritative."""
+    """Disposable shared RAM tier. SQLite is authoritative."""
 
     def __init__(
         self,

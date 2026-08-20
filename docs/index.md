@@ -16,8 +16,8 @@ only protected, recent, and relevant context into each bounded model request.
 
 ## The idea
 
-The model's native context is a reading desk. The Library holds the books that do not
-currently fit. A context governor records every event before it can expire, keeps
+The model's native context is a reading desk. The Library holds the books outside the
+active working set. A context governor records every event before it can expire, keeps
 critical and recent state resident, retrieves older relevant books, and replaces the
 desk on each call.
 
@@ -28,7 +28,7 @@ prepare(user event) -> bounded messages -> model -> commit(response)
 ```
 
 This is an alternative to making a compacted transcript the only continuation state.
-Original events remain recoverable, while the model sees a fresh bounded working set.
+Original events are recoverable, while the model sees a fresh bounded working set.
 The [related-work landscape](RELATED_WORK.md) places this boundary alongside long-context
 models, retrieval, compaction, agent memory, checkpointing, and runtime paging.
 
@@ -56,10 +56,10 @@ models, retrieval, compaction, agent memory, checkpointing, and runtime paging.
 
     Watermarks, queue occupancy, token pressure, and desk swap deltas are visible.
 
--   :material-account-group-outline: **Team memory (design only)**
+-   :material-account-group-outline: **Selective team memory**
 
-    The proposed team design promotes selected knowledge without centralizing every
-    prompt. Team sync is not implemented.
+    The team architecture separates private thread context from selectively promoted
+    shared knowledge. [Capability status](STATUS.md) defines its support boundary.
 
 </div>
 
@@ -104,19 +104,17 @@ governance requires control of the model-call boundary. The
 [agent integration guide](ADD_TO_YOUR_AGENT.md) gives tested, copy-and-paste paths and
 explains how to isolate projects and threads.
 
-## Alpha status
+## Limits and evidence
 
-The lifecycle, recovery, and bounded-prompt behavior are implemented and tested. Exact
-vector retrieval still scans a namespace, the tokenizer is approximate, and team sync
-and ACLs are designs rather than shipped features. See
-[Performance and scaling](PERFORMANCE_AND_SCALING.md) and the
-[research agenda](roadmap.md).
+Vector retrieval exact-scores every live record in a namespace, and the default token
+estimator is approximate. [Capability status](STATUS.md) defines implemented,
+experimental, planned, and unsupported boundaries.
 
-Future components are conditional rather than mandatory. Read
-[Why these improvements?](WHY_THE_ROADMAP.md) for the problem each proposal addresses,
-the reasons to defer it, simpler alternatives, adoption triggers, and evidence gates.
-The [capability status](STATUS.md) page separates implemented behavior from experiments
-and future design.
+Architectural extensions are evidence-gated rather than mandatory. See
+[Performance and scaling](PERFORMANCE_AND_SCALING.md) for measurements and benchmark
+questions, the [research agenda](roadmap.md) for sequencing, and
+[Why these improvements?](WHY_THE_ROADMAP.md) for alternatives, adoption triggers, and
+reasons to defer added complexity.
 
 Contributions that bring evidence, alternatives, failure tests, and privacy review are
 especially welcome.

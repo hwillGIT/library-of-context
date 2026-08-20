@@ -55,7 +55,7 @@ The agent must choose a unique, stable `session_id` for each thread and reuse it
 thread's desk calls. The project configuration supplies the separate database and
 namespace boundary.
 
-This mode does not shrink the host's native transcript. Tool outputs are still part of
+This mode does not shrink the host's native transcript. Tool outputs are part of
 the host-managed conversation. `library_desk_watch` updates stored desk state but cannot
 push content into a prompt; the agent must call `library_desk_get` to read it.
 
@@ -201,12 +201,12 @@ turn normally relies on the recent ring while indexing completes asynchronously.
 
 No. The automatic mode replaces the need for transcript compaction at a model gateway:
 each request is assembled afresh from protected state, recent turns, and retrieved
-books. Original events remain in SQLite.
+books. Original events are stored in SQLite.
 
 A custom `/compact` command would run after a transcript had already grown and would
-still depend on the host accepting replacement state. The Library instead intervenes
-before and after every model call. A host-specific compact command could be added later
-only when that host publishes a safe hook.
+depend on the host accepting replacement state. The Library instead intervenes
+before and after every model call. A host-specific compact command is a separate
+integration path and requires the host to publish a safe replacement hook.
 
 ## Add it to an agent that is already running
 
@@ -221,7 +221,7 @@ an entire raw transcript without review.
 
 ## Integration invariants
 
-An automatic adapter is correct only when all of the following remain true:
+An automatic adapter is correct only when all of these conditions hold:
 
 1. The user or tool event is durably prepared before the model call.
 2. The model receives only the returned `messages`, never an appended full transcript.
@@ -231,6 +231,6 @@ An automatic adapter is correct only when all of the following remain true:
 6. The final envelope is checked with the target model's tokenizer when enforcing a
    provider token limit.
 
-The built-in text adapter enforces rules 1–5. Model-accurate tokenizers, structured
-multimodal events, and native host compaction hooks remain planned work; see
-[Capability status](STATUS.md).
+The built-in text adapter enforces rules 1–5. Rule 6 depends on the target model's
+tokenizer. Structured multimodal events and native compaction require host-specific
+adapters; see [Capability status](STATUS.md).

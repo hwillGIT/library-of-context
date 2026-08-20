@@ -89,15 +89,16 @@ embedding service.
 System and developer events are protected by default. Callers can explicitly protect a
 decision, constraint, active plan, unresolved question, or important tool state.
 
-Protection means “eligible for direct residence before ordinary retrieval.” It is still
-subject to `protected_token_budget`; protection cannot silently break the model's hard
-input limit. A future policy layer should report omitted protected items as a distinct
-alert when the protected set exceeds its budget.
+Protection means “eligible for direct residence before ordinary retrieval.” Protection
+is subject to `protected_token_budget`; it cannot silently break the model's hard
+input limit. Any automatic-protection policy must report omitted protected items as a
+distinct alert when the protected set exceeds its budget.
 
 Automatic protection is disabled by default because it could preserve stale,
-conflicting, or injected instructions and crowd out current evidence. Any future policy
+conflicting, or injected instructions and crowd out current evidence. Such a policy
 must explain why an item was protected, show its evidence and release condition, and
-demonstrate improved continuity without increasing stale-instruction failures.
+produce higher continuity scores than explicit protection alone without increasing
+stale-instruction failures.
 
 `release(event_id)` removes the protection flag but retains the durable event and its
 searchable book.
@@ -109,15 +110,15 @@ Most calls should use the recent overlay and accept asynchronous index visibilit
 It fails with a timeout if that boundary is not reached. Use it for explicit audit or
 retrieval tests, not as the default interactive path.
 
-This is a deadline-bounded wait, not an unconditional guarantee under overload. The
-current per-governor workers can encounter unrelated global outbox work. A multi-agent
+This is a deadline-bounded wait, not an unconditional guarantee under overload.
+Per-governor workers can encounter unrelated global outbox work. A multi-agent
 daemon needs atomic claims, thread partitions, and priority policy before it can offer a
 stronger freshness service level.
 
 ## Work-ring overflow and recovery
 
 The bounded work ring contains only `(namespace, event_id)` references. If it is full,
-the append still succeeds because the outbox row is already durable. The worker scans
+the append succeeds because the outbox row is already durable. The worker scans
 the outbox after every task and during idle polling.
 
 After a restart:
@@ -129,7 +130,7 @@ After a restart:
 5. watermarks advance only after the index record is written.
 
 Stable IDs make duplicate work safe for correctness, but duplicate embedding and writes
-still cost resources. Multiple workers therefore require atomic claim/lease/reclaim,
+consume resources. Multiple workers therefore require atomic claim/lease/reclaim,
 retry classification, jitter, and poison-event quarantine before the outbox is treated
 as a workstation-scale queue.
 
@@ -174,5 +175,5 @@ A correct gateway must:
 - retain native provider compaction only as an emergency fallback;
 - test crash recovery between append, model call, commit, and index completion.
 
-The rationale, costs, and adoption triggers for these future policies are documented in
-[Why These Improvements?](WHY_THE_ROADMAP.md).
+See [Why These Improvements?](WHY_THE_ROADMAP.md) for policy alternatives, costs, and
+adoption criteria.

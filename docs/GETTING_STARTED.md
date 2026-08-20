@@ -1,7 +1,7 @@
 # Getting started
 
 Run the disposable quickstart to verify local persistence, prompt budgeting, and
-indexing before connecting an agent. The first run uses SQLite and the built-in hashing
+indexing before connecting an agent. The command uses SQLite and the built-in hashing
 embedder. It needs no Redis, Docker, cloud account, model API, or payment.
 
 ## What you will verify
@@ -28,9 +28,8 @@ git clone https://github.com/hwillGIT/library-of-context.git
 cd library-of-context
 ```
 
-Use the Python executable inside the virtual environment explicitly. That makes the
-same interpreter usable later by an agent process that does not inherit your activated
-shell.
+Use the Python executable inside the virtual environment explicitly. This path lets an
+agent process use the same environment without inheriting an activated shell.
 
 === "Windows PowerShell"
 
@@ -78,18 +77,18 @@ the complete error when opening an issue.
 
 | Your agent environment | What the Library can do | Next step |
 |---|---|---|
-| Existing MCP-capable agent, such as Codex | Cooperative local memory and retrieval | [Add it as an MCP server](ADD_TO_YOUR_AGENT.md#option-a-add-cooperative-memory-to-an-mcp-agent) |
+| MCP-capable agent, such as Codex | Cooperative local memory and retrieval | [Add it as an MCP server](ADD_TO_YOUR_AGENT.md#option-a-add-cooperative-memory-to-an-mcp-agent) |
 | Python agent or model gateway you can edit | Automatically enforce a bounded text prompt on every call | [Wrap the model-call boundary](ADD_TO_YOUR_AGENT.md#option-b-govern-a-python-text-agent-automatically) |
 | JavaScript, Go, Rust, or another local gateway | Automatically govern calls through the loopback HTTP API | [Use the HTTP boundary](ADD_TO_YOUR_AGENT.md#option-c-govern-a-non-python-agent-over-http) |
-| Hosted agent with no MCP and no pre/post model hooks | No transparent integration yet | Add a supported hook or use the Library manually |
+| Hosted agent with no MCP and no pre/post model hooks | Manual Library operations only; automatic prompt control requires a supported hook | Add a supported hook or use the Library manually |
 
 Read [Add the Library to your agent](ADD_TO_YOUR_AGENT.md) before choosing. In
 particular, an MCP tool cannot rewrite the private request that already caused the host
 to call it. Automatic prompt control requires a gateway that owns the model call.
 
-## Where real data goes
+## Where integration data goes
 
-The quickstart retains nothing. A real integration writes to the SQLite path you
+The quickstart retains nothing. An integration writes to the SQLite path you
 configure, for example `data/my-project.sqlite`. SQLite is authoritative. Process RAM
 and optional Redis are accelerators and may be discarded.
 
@@ -101,7 +100,7 @@ The Library can store prompts, tool results, code, and project facts. Keep its d
 private, do not store credentials, and review content before moving it into a shared
 project or team scope.
 
-## Redis remains optional
+## Redis is optional
 
 Start without Redis. The default 256 MiB process cache plus SQLite is enough to evaluate
 the workflow. Add a dedicated local Redis instance only after measurements show that

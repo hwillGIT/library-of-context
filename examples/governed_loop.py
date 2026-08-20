@@ -33,7 +33,7 @@ with TemporaryDirectory() as directory:
             for message in request.messages:
                 print(f"[{message['role']}] {message['content']}")
 
-            # Send request.messages to the model here. Record the returned result:
+            # The model call receives only request.messages; commit stores its result.
             context.commit("Begin production with a canary wave.")
             context.flush(timeout=3)
             print(context.status()["watermarks"])

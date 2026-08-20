@@ -58,7 +58,7 @@ class _CacheStub:
         return self.records.get(record_id)
 
 
-class ContextSwapperModularityTests(unittest.TestCase):
+class ContextSwapperTests(unittest.TestCase):
     def test_retrieval_orders_pins_then_ranked_hits_and_applies_exclusions(
         self,
     ) -> None:
@@ -133,7 +133,7 @@ class ContextSwapperModularityTests(unittest.TestCase):
         self.assertEqual(swapped_out, ["a"])
         self.assertEqual(retained, ["c", "b"])
 
-    def test_refresh_preserves_working_set_payload_and_swap_state(self) -> None:
+    def test_refresh_returns_working_set_payload_and_swap_state(self) -> None:
         cache = _CacheStub([_hit("a", 0.9), _hit("b", 0.8)])
         swapper = ContextSwapper(cache)  # type: ignore[arg-type]
 

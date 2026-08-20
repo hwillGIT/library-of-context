@@ -11,10 +11,10 @@ counterarguments are in [Why These Improvements?](WHY_THE_ROADMAP.md).
 The [related-work landscape](RELATED_WORK.md) supplies comparative evidence;
 inclusion there is neither adoption nor a roadmap commitment.
 
-## Near-term sequence
+## Planned sequence
 
-1. Publish reproducible retrieval, prompt, queue, and recovery benchmarks so later
-   changes have a quality and resource baseline.
+1. Publish reproducible retrieval, prompt, queue, and recovery benchmarks to establish
+   a quality and resource baseline for subsequent decisions.
 2. Add model-aware tokenizers and complete cache/index identity because these protect
    prompt and cache correctness.
 3. Introduce local ANN and bounded hybrid reranking only when exact search crosses the
@@ -23,8 +23,9 @@ inclusion there is neither adoption nor a roadmap commitment.
    duplicate work, memory, or contention.
 5. Add capsules, branch behavior, and scope routing only when evaluations demonstrate
    continuity or collaboration failures that basic paging does not solve.
-6. Design authenticated selective team promotion only for a real cross-workstation
-   knowledge need; earn a broker or cloud plane through measured requirements.
+6. Design authenticated selective team promotion only for a demonstrated
+   cross-workstation knowledge need; use a broker or cloud plane only when measured
+   replay, fan-out, or coordination requirements exceed a direct sync service.
 
 ## Questions looking for evidence
 

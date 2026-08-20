@@ -11,11 +11,11 @@ not implemented.
 | Recent-event read-your-own-context overlay | Implemented | Unindexed recent events remain directly visible |
 | Explicit protect and release | Implemented | Protected set remains subject to its token budget |
 | Bounded work ring with durable spill | Implemented | Ring is dispatch acceleration; outbox is recovery truth |
-| Recorded, embedded, and indexed watermarks | Implemented | Embedding and indexing currently advance together |
+| Recorded, embedded, and indexed watermarks | Implemented | Embedding and indexing advance together |
 | SQLite FTS plus exact vector hybrid retrieval | Implemented | FTS output is bounded; vector work grows with namespace size |
 | Process RAM cache | Implemented | Disposable byte-estimated LRU |
 | Local Redis hot cache | Experimental and optional | Disposable; no TLS; not a broker or source of truth |
-| Local Ollama embeddings | Experimental and optional | Local HTTP adapter; no batching or connection pool yet |
+| Local Ollama embeddings | Experimental and optional | Local HTTP adapter; no batching or connection pool |
 | Loopback HTTP service | Development surface | No authentication or TLS; do not expose to a network |
 | Python text-agent adapter | Implemented | Automatically governs stateless text callbacks; structured tools and multimodal values need custom adapters |
 | STDIO MCP Library and desk tools | Implemented cooperative integration | Cannot seize an undocumented host compaction hook |
@@ -32,15 +32,15 @@ not implemented.
 | Knowledge-card promotion workflow | Team-only design | Not implemented; raw threads remain local by default |
 | Shared identity, ACL, tombstones, and audit | Team-only design | Mandatory before any mixed-trust catalog |
 | Durable team sync or broker | Team-only design | No broker is deployed; simple database sync should be tested first |
-| Cloud control plane | Optional future design | Must remain outside local prompt construction |
+| Cloud control plane | Planned and optional | Must remain outside local prompt construction |
 
 ## Status meanings
 
-- **Implemented:** covered by the current public code and functional tests.
+- **Implemented:** covered by public code and functional tests.
 - **Experimental:** usable for local evaluation but not a production support claim.
 - **Development surface:** limited to its stated boundary and unsafe to expose beyond
   it.
-- **Planned:** a design direction that still needs its adoption trigger and evidence
+- **Planned:** a design direction that requires its adoption trigger and evidence
   gate satisfied.
 - **Scale-triggered:** not inherently better; add only after measured local pressure.
 - **Research:** desired behavior is not settled and may be rejected after evaluation.

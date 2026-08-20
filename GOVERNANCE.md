@@ -1,7 +1,6 @@
 # Governance
 
-The Library of Context currently uses a maintainer-led, evidence-seeking model suitable
-for an early open-source project.
+The Library of Context uses a maintainer-led, evidence-seeking model.
 
 ## Decision principles
 

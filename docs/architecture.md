@@ -7,7 +7,7 @@ model's native context. It uses the native window as a bounded working set and s
 larger addressable history in local memory and disk.
 
 See [Related Work and Design Landscape](RELATED_WORK.md) for comparative evidence.
-[Capability Status](STATUS.md) remains the authority for shipped behavior.
+[Capability Status](STATUS.md) lists implementation support and limitations.
 
 ## Invariants
 
@@ -62,8 +62,9 @@ outbox is durable.
 ## Retrieval
 
 The portable hybrid ranker combines exact vector similarity, bounded FTS rank,
-importance, and recency. FTS returns candidate IDs directly. Vector search still exact
-scores all live namespace records; a local ANN adapter is the main scaling requirement.
+importance, and recency. FTS returns candidate IDs directly. Vector search exact-scores
+all live namespace records; consistently bounded work at large catalog sizes requires a
+local ANN adapter.
 
 ## Failure semantics
 
@@ -73,6 +74,5 @@ scores all live namespace records; a local ANN adapter is the main scaling requi
 - Strict freshness waits for the indexed watermark and may time out.
 - Team/cloud loss does not disable local prompt construction.
 
-The complete architecture, including limitations and team evolution, is maintained in
-the repository's
+For schema, process, failure, security, and team boundaries, see
 [ARCHITECTURE.md](https://github.com/hwillGIT/library-of-context/blob/main/ARCHITECTURE.md).

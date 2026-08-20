@@ -5,6 +5,26 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class DocumentationContractTests(unittest.TestCase):
+    def test_timeless_prose_rule_and_skill_are_discoverable(self) -> None:
+        skill = (
+            ROOT / ".agents" / "skills" / "write-timeless-technical-prose" / "SKILL.md"
+        )
+        metadata = skill.parent / "agents" / "openai.yaml"
+
+        self.assertTrue(skill.is_file())
+        self.assertTrue(metadata.is_file())
+        skill_text = skill.read_text(encoding="utf-8")
+        self.assertIn("name: write-timeless-technical-prose", skill_text)
+        self.assertIn("one coherent editorial present", skill_text)
+        self.assertIn("Remove temporal provenance", skill_text)
+        self.assertNotIn("TODO", skill_text)
+
+        for source in ("AGENTS.md", "CONTRIBUTING.md", "docs/contributing.md"):
+            with self.subTest(source=source):
+                text = (ROOT / source).read_text(encoding="utf-8")
+                self.assertIn("write-timeless-technical-prose/SKILL.md", text)
+                self.assertRegex(text, r"relative to (?:another|other content)")
+
     def test_related_work_is_in_site_navigation(self) -> None:
         related_work = ROOT / "docs" / "RELATED_WORK.md"
 

@@ -5,7 +5,7 @@ Treat its SQLite files, WAL files, Redis data, process memory, logs, and backups
 sensitive.
 
 !!! warning
-    The current loopback HTTP service has no authentication or TLS. The Redis client
+    The loopback HTTP service has no authentication or TLS. The Redis client
     does not support `rediss://`. Do not expose either service directly to a shared or
     untrusted network.
 

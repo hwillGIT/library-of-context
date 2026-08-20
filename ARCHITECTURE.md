@@ -14,7 +14,7 @@ working set for each governed call. It increases addressable context, not the mo
 physical input limit.
 
 See [Related Work and Design Landscape](docs/RELATED_WORK.md) for comparative evidence.
-[Capability Status](docs/STATUS.md) remains the authority for shipped behavior.
+[Capability Status](docs/STATUS.md) lists implementation support and limitations.
 
 ## Core invariants
 
@@ -29,7 +29,7 @@ See [Related Work and Design Landscape](docs/RELATED_WORK.md) for comparative ev
 5. **One replacement desk.** Retrieved Library context replaces the prior block instead
    of being appended indefinitely.
 6. **SQLite is authoritative.** RAM and Redis are disposable accelerators.
-7. **Cloud independence.** A local prompt must remain possible when Redis, a team relay,
+7. **Cloud independence.** A local prompt must be possible when Redis, a team relay,
    or the network is unavailable.
 
 ## Governed turn lifecycle
@@ -71,9 +71,9 @@ Every thread reports:
 - `team_synced_through`: reserved for acknowledged selective team promotion;
 - `pending_events`: durable events waiting in the local outbox.
 
-The current local worker embeds and indexes in one step, so the embedded and indexed
-watermarks advance together. Separate stages can split them later without changing the
-public contract.
+The local worker embeds and indexes in one step, so the embedded and indexed
+watermarks advance together. The public contract permits separate stages with
+independent watermarks.
 
 ## Prompt assembly
 
@@ -120,13 +120,13 @@ ring. Index writes use stable record IDs, so replay is idempotent.
 record ID, timestamps, and index visibility. `context_outbox` is written in the same
 SQLite transaction as its event.
 
-Indexed books remain in `records`, with text, metadata, provenance, importance,
+`records` stores indexed books with text, metadata, provenance, importance,
 timestamps, content hash, and float32 vectors. `records_fts` provides lexical candidate
 IDs without joining every match against the complete record table.
 
 ## Retrieval and reading-desk paging
 
-Current ranking combines:
+The default ranker combines:
 
 ```text
 0.60 × normalized cosine similarity
@@ -145,15 +145,15 @@ retained    = new desk ∩ previous desk
 ```
 
 FTS output and downstream record hydration are bounded by candidate count, although
-SQLite FTS may still inspect a selectivity-dependent posting list internally. The
+SQLite FTS may inspect a selectivity-dependent posting list internally. The
 portable vector path exact-scores all live records in a namespace. An ANN adapter is
 required for consistently bounded retrieval work after the exact path crosses a
 declared large-catalog latency or memory target.
 
 ## Process and concurrency model
 
-The current implementation can run in-process, through the local HTTP server, or as a
-STDIO MCP process. Each governor has one bounded worker ring and one indexing thread.
+The Library runs in-process, through the local HTTP server, or as an STDIO MCP process.
+Each governor has one bounded worker ring and one indexing thread.
 SQLite access is serialized through the store connection lock. This process model
 targets a small local workload and duplicates workers and cache state when several agent
 processes run concurrently.
@@ -163,9 +163,9 @@ because they own the subsequent model call. A normal MCP host invokes tools from
 an existing turn, so its safe profile is cooperative shelving and reading-desk recall;
 it cannot use the tool result to retroactively bound that turn.
 
-The intended next topology is one supervised Library daemon per workstation, with thin
-MCP/HTTP/named-pipe bridges. A fixed worker pool would partition events by
-`(project_id, thread_id)`, preserve order inside a thread, and process independent
+A workstation-scale deployment requires one supervised Library daemon with thin
+MCP, HTTP, or named-pipe bridges. A fixed worker pool partitions events by
+`(project_id, thread_id)`, preserves order inside a thread, and processes independent
 threads concurrently.
 
 ### Code organization
@@ -194,20 +194,21 @@ threads concurrently.
 | Strict freshness times out | Caller receives a timeout instead of false freshness |
 | Team/cloud plane is unavailable | Local prompt construction continues |
 
-SQLite currently uses WAL with `synchronous=NORMAL`. A deployment requiring power-loss
+SQLite uses WAL with `synchronous=NORMAL`. A deployment requiring power-loss
 RPO 0 must select and test a stronger fsync policy.
 
-## Local-first team evolution
+## Local-first team boundary
 
-Raw thread events remain private and local by default. A future promotion compiler may
+Raw thread events are private and local by default. A promotion compiler can
 turn selected decisions, facts, evidence, summaries, and artifacts into approved team
 knowledge cards. Those cards can move asynchronously through a durable acknowledged
 stream into an ACL-aware project catalog.
 
 Redis Pub/Sub is suitable only as a wake-up or invalidation hint because it does not
-provide durable replay. The current persistence-disabled Redis cache must never be
+provide durable replay. The persistence-disabled local Redis cache must never be
 treated as the team broker. Redis Streams, NATS JetStream, or another durable system are
-possible team-plane choices, while SQLite outbox/inbox records remain the local truth.
+possible team-plane choices, while SQLite outbox/inbox records are the local source of
+truth.
 
 See [Team Architecture](docs/TEAM_ARCHITECTURE.md).
 
@@ -228,9 +229,10 @@ and authorization filters enforced before candidate retrieval and hydration.
 - Embedding/index workers are single-threaded per governor and do not batch requests.
 - Multiple governors can observe the same shared outbox and may perform harmless
   duplicate idempotent work.
-- There is no team sync, ACL, branch merge, or knowledge-promotion implementation yet.
+- Team synchronization, ACLs, branch merging, and knowledge promotion are outside the
+  implemented local boundary.
 - The MCP integration cannot replace an undocumented host-internal compaction hook.
 
 See [Performance and Scaling](docs/PERFORMANCE_AND_SCALING.md),
-[Why These Improvements?](docs/WHY_THE_ROADMAP.md), and [Roadmap](ROADMAP.md) for planned
-changes and evaluation criteria.
+[Why These Improvements?](docs/WHY_THE_ROADMAP.md), and [Roadmap](ROADMAP.md) for design
+alternatives and evaluation criteria.

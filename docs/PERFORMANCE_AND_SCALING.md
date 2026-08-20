@@ -4,11 +4,14 @@ Unless identified as observed measurements, the figures below are proposed targe
 Record hardware, Python version, embedding model, cardinality, query selectivity,
 concurrency, and cache state with every result.
 
-## Baseline audit
+## Diagnostic measurements
 
-The first prototype used an FTS query that joined every FTS match to a computed record
-key. On one Windows/Python 3.13 workstation with the dependency-free 384-dimensional
-hashing embedder and Redis disabled, representative cold retrievals were:
+### Computed-key lexical-join query
+
+An FTS query that joins every match to a computed record key produced the following
+results on one Windows/Python
+3.13 workstation with the dependency-free 384-dimensional hashing embedder and Redis
+disabled:
 
 | Records | Query shape | Observed latency |
 |---:|---|---:|
@@ -18,20 +21,22 @@ hashing embedder and Redis disabled, representative cold retrievals were:
 | 2,500 | about 20% lexical match | about 1.76 seconds |
 
 `EXPLAIN QUERY PLAN` showed scans of both the FTS and record tables plus a temporary
-B-tree. The current implementation removes that join and returns bounded FTS record IDs
-directly. These baseline numbers must not be presented as current post-fix results; a
-repeatable benchmark harness is still needed.
+B-tree. These measurements characterize the computed-key lexical-join query and do not
+represent retrieval with bounded FTS record IDs.
 
-A post-fix diagnostic spot check on 2026-08-20 used disposable databases, Python 3.13,
+### Bounded-candidate query
+
+A diagnostic spot check on 2026-08-20 used disposable databases, Python 3.13,
 the 384-dimensional hashing embedder, Redis disabled, and one thread. Representative
 cold common-term queries were about 27 ms at 1,000 records, 93 ms at 3,000, and 330 ms
-at 10,000. These measurements are consistent with removal of the pathological lexical
-join and show the exact vector scan as the visible growth path. They are not a versioned
-benchmark result or a performance guarantee for other hardware.
+at 10,000. The bounded query returns FTS record IDs directly without the temporary
+record-table join. These measurements expose the exact vector scan as the visible growth
+path. They are diagnostic results, not a versioned benchmark or a performance guarantee
+for other hardware.
 
-## Current bottleneck
+## Exact-vector bottleneck
 
-Cold vector retrieval still:
+Cold vector retrieval:
 
 1. loads every live record in a namespace;
 2. deserializes every vector into Python floats;
@@ -44,11 +49,12 @@ catalog query.
 
 The context governor fixes a different latency problem: durable append can be
 acknowledged before embedding/index completion, and the recent overlay prevents fresh
-events from disappearing. It does not make the current vector scan sublinear.
+events from disappearing. It does not make the exact vector scan sublinear.
 
 ## Provisional performance gates
 
-These are design targets for contributors to challenge and refine, not current claims.
+These values are proposed acceptance targets, not observed results or performance
+guarantees.
 
 | Capability | Proposed target |
 |---|---|
@@ -93,28 +99,28 @@ drain rate.
 Report p50/p95/p99 latency, throughput, peak RSS, database bytes read/written, Redis
 round trips and bytes, queue age, cache hit rate, recall, NDCG, and answer grounding.
 
-Do not run the full Cartesian matrix on every pull request. Use three tiers: a small
-deterministic PR smoke suite, scheduled or nightly scale and fault suites, and a release
-suite that covers the declared workload profiles. Raw results and workload definitions
-must be versioned so comparisons remain meaningful.
+Benchmark execution uses three tiers: a small deterministic smoke suite for routine
+validation, scheduled or nightly scale and fault suites, and a release suite that covers
+the declared workload profiles. Raw results and workload definitions must be versioned
+so comparisons are meaningful.
 
-## High-value implementation work
+## Conditional scaling mechanisms
 
 ### Candidate generation and ANN
 
-Introduce a vector-index interface and compare local adapters such as sqlite-vector
-extensions, HNSW libraries, and embedded vector stores. Hybrid retrieval should union a
-bounded vector candidate set and bounded FTS candidate set, apply authorization before
-hydration, and exact-rerank only tens or hundreds of candidates.
+A vector-index interface can support local adapters such as sqlite-vector extensions,
+HNSW libraries, and embedded vector stores. Scalable hybrid retrieval unions a bounded
+vector candidate set with a bounded FTS candidate set, applies authorization before
+hydration, and exact-reranks only tens or hundreds of candidates.
 
-**Why:** the exact vector path grows in latency and transient memory with the namespace.
-**Why not automatically:** ANN loses some recall, adds native packaging and index
-recovery, and can be slower than exact scoring for a small catalog. **Adopt when:** the
-exact reference crosses the declared cold-query or memory SLO on target hardware, then
-require quality, rebuild, deletion, filter, and cross-platform evidence.
+**Constraint:** exact vector scoring grows in latency and transient memory with namespace
+size. **Trade-off:** ANN loses some recall, adds native packaging and index recovery, and
+can be slower than exact scoring for a small catalog. **Adoption criterion:** the exact
+reference crosses the declared cold-query or memory SLO on target hardware, with quality,
+rebuild, deletion, filter, and cross-platform evidence available.
 
 Bounded FTS output does not mean the FTS engine performs constant internal work; broad
-posting lists and FTS update/delete maintenance remain selectivity- and schema-dependent.
+posting lists and FTS update/delete maintenance are selectivity- and schema-dependent.
 
 Questions:
 
@@ -125,15 +131,16 @@ Questions:
 
 ### Token accounting and packing
 
-The current four-characters-per-token estimate is dependency-free but not model exact.
-Add tokenizer adapters, hard byte/token ceilings, and coverage for CJK, code, very long
-unbroken input, tool payloads, and mixed modalities.
+The dependency-free default estimates one token per four characters but is not model
+exact. Model-specific integrations require tokenizer adapters, hard byte and token
+ceilings, and coverage for CJK, code, very long unbroken input, tool payloads, and mixed
+modalities.
 
-**Why:** a real model-token overrun violates the bounded-context contract. **Why not one
-mandatory tokenizer:** providers and model revisions differ, and a provider dependency
-would weaken the zero-dependency local core. **Adopt when:** a production integration
-selects a model or adversarial tests expose estimator drift; preserve a conservative
-fallback and version derived counts.
+**Constraint:** a model-token overrun violates the bounded-context contract.
+**Trade-off:** providers and model revisions use different tokenizers, and a provider
+dependency would weaken the dependency-free local core. **Adoption criterion:** a
+model-specific integration selects its tokenizer or adversarial tests expose estimator
+drift; a conservative fallback is available and derived counts are versioned.
 
 Questions:
 
@@ -144,17 +151,17 @@ Questions:
 
 ### Worker topology
 
-Move from one indexing thread per governor toward one supervised workstation daemon,
-one scheduler, and fixed worker pools. Partition by `(project_id, thread_id)` to preserve
-thread order while allowing independent threads to run concurrently. Batch embeddings
-by total tokens and pool local HTTP connections.
+For workstation-scale workloads, one supervised daemon, one scheduler, and fixed worker
+pools replace per-governor indexing threads. Partitioning by `(project_id, thread_id)`
+preserves thread order while allowing independent threads to run concurrently.
+Embedding batches use total-token limits, and local HTTP connections are pooled.
 
-**Why:** shared ownership bounds threads, duplicate work, connections, and aggregate
-cache memory. **Why not automatically:** a daemon adds IPC, supervision, upgrade, local
+**Constraint:** shared ownership bounds threads, duplicate work, connections, and
+aggregate cache memory. **Trade-off:** a daemon adds IPC, supervision, upgrade, local
 security, and a workstation failure boundary; batching adds queue delay and partial-
-failure policy. **Adopt when:** measured duplicate work, contention, queue age, or memory
-breaks the declared multi-agent profile. A solo large catalog may need ANN without a
-daemon; many agents over a small catalog may need the daemon without ANN.
+failure policy. **Adoption criterion:** measured duplicate work, contention, queue age,
+or memory breaks the declared multi-agent profile. A solo large catalog may need ANN
+without a daemon; many agents over a small catalog may need the daemon without ANN.
 
 Questions:
 
@@ -166,21 +173,22 @@ Questions:
 
 Cache identities must include ranking weights, recency policy, embedding provider/model
 and revision, tokenizer/ranker version, authorization fingerprint, and index snapshot.
-Namespace-wide generation invalidation should evolve into thread/project snapshot
-epochs. Cache candidate IDs and scores rather than duplicating full vectors and text.
+Thread and project snapshot epochs provide finer invalidation than one namespace-wide
+generation. Cache candidate IDs and scores rather than duplicating full vectors and
+text.
 
-**Why:** an incomplete identity can return wrongly ranked, stale, or unauthorized data.
-**Why not include every runtime value:** unnecessary dimensions fragment the cache,
-increase storage, and reduce reuse. **Adopt when:** correctness dimensions become
-configurable; canonicalize only inputs that change ranking, visibility, or permission,
-and measure hit rate and key growth after the change.
+**Constraint:** an incomplete identity can return wrongly ranked, stale, or unauthorized
+data. **Trade-off:** unnecessary identity dimensions fragment the cache, increase
+storage, and reduce reuse. **Adoption criterion:** canonicalize inputs that affect
+ranking, visibility, or permission, and measure hit rate and key growth when those
+dimensions become configurable.
 
-For the full dialectic, alternatives, and adoption triggers, see
-[Why These Improvements?](WHY_THE_ROADMAP.md).
+See [Why These Improvements?](WHY_THE_ROADMAP.md) for alternatives, costs, and adoption
+criteria.
 
-## Reproducibility contribution format
+## Benchmark evidence requirements
 
-A performance pull request should include:
+A reproducible performance claim includes:
 
 1. the benchmark code and synthetic-data generator;
 2. exact environment and dependency versions;
@@ -188,6 +196,7 @@ A performance pull request should include:
 4. plots or compact tables;
 5. retrieval-quality deltas, not latency alone;
 6. failure and recovery behavior;
-7. a comparison against the existing exact scorer.
+7. a comparison against the exact reference scorer.
 
-Optimization without a quality baseline is not sufficient for retrieval changes.
+A retrieval optimization requires a quality baseline in addition to latency
+measurements.

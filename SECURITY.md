@@ -1,15 +1,14 @@
 # Security Policy
 
-## Project status
+## Data sensitivity
 
-The Library of Context is experimental alpha software. It may store conversations,
-source code, documents, tool outputs, embeddings, and derived context. Treat its data
-directory as sensitive.
+The Library of Context may store conversations, source code, documents, tool outputs,
+embeddings, and derived context. Treat its data directory as sensitive.
 
 ## Supported versions
 
-Security fixes are currently made on the latest `main` branch. No stable release line
-or long-term support promise exists yet.
+The `main` branch receives security fixes. The project provides no stable release line
+or long-term support promise.
 
 ## Report a vulnerability
 
@@ -21,7 +20,7 @@ the maintainers for a secure contact channel without describing the vulnerabilit
 Include affected versions, impact, reproduction conditions, and suggested mitigation
 when possible. Do not access data or systems you do not own or have permission to test.
 
-## Current security boundary
+## Security boundary
 
 - SQLite is authoritative and contains plaintext unless protected by the operating
   system or encrypted storage.
@@ -33,8 +32,8 @@ when possible. Do not access data or systems you do not own or have permission t
   explicitly changes its endpoint.
 - No team ACL, authenticated sync, or multi-tenant isolation is implemented.
 
-Never expose the current HTTP service or Redis instance directly to an untrusted or
-shared network.
+Never expose the HTTP service or Redis instance directly to an untrusted or shared
+network.
 
 ## Threats contributors should consider
 

@@ -35,9 +35,9 @@ The example uses a project-specific database and namespace. For every agent thre
 instructions tell the agent to choose a unique, stable `session_id`.
 Reusing `default` or `codex` across unrelated work can mix retrieved context.
 
-A global MCP entry in `~/.codex/config.toml` is convenient, but it also creates a global
-memory boundary unless every client routes projects to separate databases or
-namespaces. Project-scoped configuration is the safer first-run default.
+A global MCP entry in `~/.codex/config.toml` creates a global memory boundary unless
+every client routes projects to separate databases or namespaces. Project-scoped
+configuration limits the default memory boundary to one project.
 
 ## What the cooperative tools do
 

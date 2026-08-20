@@ -184,7 +184,7 @@ class GovernorHTTPTests(unittest.TestCase):
                     "/context/commit",
                     {
                         "session_id": "http-governed",
-                        "content": "The response is now durable.",
+                        "content": "The response is durable.",
                     },
                 )
                 self.assertEqual(status_code, 201)

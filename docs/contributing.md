@@ -16,8 +16,18 @@ Large persistence, ordering, security, broker, retrieval-policy, or public-API c
 should begin with an RFC issue. Performance changes need quality evidence as well as
 latency evidence.
 
-Substantial proposals must explain why the change is justified, why the current design
-may remain better, alternatives, non-goals, the measurable adoption trigger, evidence
+Write explanatory prose in one editorial present. State behavior, constraints, failure
+modes, and operational rationale without narrating the prompt, author process, or edit
+history. Do not describe when a section, component, example, or explanation entered the
+repository relative to other content. Put chronology in the changelog, status, roadmap,
+migration, compatibility, or citation material where it affects the document's purpose.
+The repository's
+[timeless technical prose skill](https://github.com/hwillGIT/library-of-context/blob/main/.agents/skills/write-timeless-technical-prose/SKILL.md)
+defines the review procedure. Replace freestanding labels such as updated, latest, or
+improved with the resulting behavior, version boundary, or measured comparison.
+
+Substantial proposals must explain why the change is justified, when the baseline design
+is preferable, alternatives, non-goals, the measurable adoption trigger, evidence
 gate, failure behavior, and rollback. Read [Why These Improvements?](WHY_THE_ROADMAP.md)
 and use the [Decision Brief Template](DECISION_BRIEF_TEMPLATE.md).
 

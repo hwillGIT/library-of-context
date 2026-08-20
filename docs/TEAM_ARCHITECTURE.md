@@ -1,12 +1,11 @@
 # Local-First Team Architecture
 
-Version 0.3 supports local agent threads. Team scaling must not make a remote service a
-dependency of every prompt.
+The optional team topology builds on local agent threads. Team scaling must not make a
+remote service a dependency of every prompt.
 
 > [!NOTE]
-> The topology below is a proposal. Team sync, shared authorization, promotion
-> workflows, and brokers are not implemented in version 0.3. The local event/outbox and
-> context-governor foundation is implemented.
+> Team synchronization, shared authorization, promotion workflows, and brokers are
+> design-only. See [Capability Status](STATUS.md) for implemented behavior.
 
 The team plane is conditional, not the destination of every installation. A solo user
 should not need identity infrastructure or a broker. See
@@ -19,9 +18,9 @@ case for each major subsystem.
 private thread -> personal reusable knowledge -> project knowledge -> team catalog
 ```
 
-Raw prompts, tool traces, and private working state remain local by default. Promotion
-is explicit and selective. Good promotion candidates include decisions, approved facts,
-runbooks, evidence, summaries, and artifact references. Credentials, raw private
+Raw prompts, tool traces, and private working state are local by default. Promotion
+is explicit and selective. Eligible promotion content includes decisions, approved
+facts, runbooks, evidence, summaries, and artifact references. Credentials, raw private
 conversations, and incidental chain-of-work data should not move automatically.
 
 ## Recommended topology
@@ -69,9 +68,8 @@ context payload by default.
 ## Broker choices
 
 Raw Redis Pub/Sub is a useful low-latency wake-up hint but has no durable replay,
-acknowledgement, consumer lag, or offline recovery. The current local Redis instance is
-configured as a disposable LFU cache with persistence disabled, so it must not own team
-events.
+acknowledgement, consumer lag, or offline recovery. Local Redis is a disposable LFU
+cache with persistence disabled, so it must not own team events.
 
 Redis Streams can provide consumer groups, pending entries, acknowledgement, and replay
 when deployed as a separate durable service. NATS JetStream and other durable brokers
@@ -85,7 +83,7 @@ are valid alternatives. In every case:
 - trim only behind acknowledged watermarks;
 - preserve the SQLite outbox/inbox as each node's recovery truth.
 
-### Why a broker—and why not yet
+### Broker adoption criteria and costs
 
 A broker becomes useful when independently failing nodes need replay, several consumers
 need the same events, or polling load and visibility delay exceed the declared sync SLO.
@@ -93,11 +91,11 @@ It also introduces retention, poison-event handling, consumer recovery, upgrades
 backups, monitoring, and an on-call responsibility. It does not solve promotion policy,
 identity, authorization, deletion, or semantic conflicts.
 
-The first small-team implementation can use authenticated batch push/pull against a
-durable team event table with per-node cursors. Add a broker only after promotion and
-authorization semantics are stable and measured fan-out, event rate, or offline replay
-requirements justify it. Redis Streams must use a separate persistence-enabled service;
-the disposable LFU cache remains unsuitable.
+A small team can use authenticated batch push/pull against a durable team event table
+with per-node cursors. A broker is justified only when promotion and authorization
+semantics are stable and measured fan-out, event rate, or offline replay requirements
+exceed that design. Redis Streams require a separate persistence-enabled service; the
+disposable LFU cache is unsuitable.
 
 ## Promotion compiler
 
@@ -151,9 +149,9 @@ expensive and unnecessary. Stable event IDs make duplicate delivery safe. Each n
 tracks recorded, indexed, and team-synced watermarks.
 
 One monotonic per-thread sequence also implies one active sequence owner. Two offline
-devices cannot allocate the same global sequence safely without a lease. The initial
-team design should use a single-writer thread lease; a future multi-writer design needs
-device-local sequences, causal metadata, and explicit conflict ordering.
+devices cannot allocate the same global sequence safely without a lease. A single-writer
+design uses a thread lease; a multi-writer design requires device-local sequences,
+causal metadata, and explicit conflict ordering.
 
 Thread branches can reference `parent_thread_id` plus a parent sequence or context
 snapshot. Merging should promote explicit decisions or cards rather than concatenate
@@ -166,15 +164,16 @@ two raw transcripts.
 | Embedded local process | One process or small solo workload meets its SLOs | Several agents duplicate workers and memory | Limited cross-process coordination |
 | Local daemon + rings/outbox | Workstation contention or shared quotas are measured | One embedded process is sufficient | Supervision, IPC, and local SPOF |
 | Federated peer nodes | Organizational constraints prohibit a shared catalog | The team cannot own discovery, conflict, and revocation complexity | Highest distributed-systems burden |
-| Local nodes + shared control plane | Several principals need policy, audit, and promoted search | Manual or one-database sync still meets the need | Service cost, privacy expansion, operations |
+| Local nodes + shared control plane | Several principals need policy, audit, and promoted search | Manual or one-database sync meets the need | Service cost, privacy expansion, operations |
 | Cloud-central prompt memory | Only when offline/local independence is not required | For the Library's primary local-first promise | Network dependency and centralized raw context |
 
-The candidate distributed-team topology uses local nodes plus an optional shared control
-plane. Remote services remain outside prompt construction. A trusted small team should
-first test reviewed cards and a durable sync API; add a cloud or broker layer only after
-measured fan-out, replay, or coordination requirements exceed the local design.
+The recommended distributed-team topology uses local nodes plus an optional shared
+control plane. Remote services are outside prompt construction. For a trusted small
+team, reviewed cards and a durable sync API provide the simplest starting point. A cloud
+or broker layer is justified only when measured fan-out, replay, or coordination
+requirements exceed the local design.
 
-## Open collaboration questions
+## Open design questions
 
 - What approval experience makes promotion useful without becoming burdensome?
 - Which data must never leave a workstation?

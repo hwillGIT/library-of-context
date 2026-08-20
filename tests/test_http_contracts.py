@@ -38,7 +38,7 @@ class HTTPApplicationRoutingTests(unittest.TestCase):
         response = self.application.dispatch(method, target, body)
         return response.status, response.body
 
-    def test_library_and_desk_routes_preserve_aliases_and_statuses(self) -> None:
+    def test_library_and_desk_aliases_return_expected_statuses(self) -> None:
         status, health = self.dispatch("GET", "/health")
         self.assertEqual(status, 200)
         self.assertTrue(health["ok"])
@@ -113,7 +113,7 @@ class HTTPApplicationRoutingTests(unittest.TestCase):
         self.assertEqual(self.dispatch("POST", "/not-a-route", {})[0], 404)
         self.assertEqual(self.dispatch("DELETE", "/not-a-route")[0], 404)
 
-    def test_governor_routes_preserve_both_endpoint_families(self) -> None:
+    def test_governor_endpoint_families_support_the_same_operations(self) -> None:
         for prefix in ("governor", "context"):
             session_id = f"{prefix}-session"
             settings: dict[str, object] = {
@@ -166,7 +166,7 @@ class HTTPApplicationRoutingTests(unittest.TestCase):
             self.assertEqual(current["session_id"], session_id)
 
 
-class HTTPTransportCompatibilityTests(unittest.TestCase):
+class HTTPTransportContractTests(unittest.TestCase):
     def setUp(self) -> None:
         self.directory = tempfile.TemporaryDirectory()
         self.library = LibraryOfContext(
@@ -214,7 +214,7 @@ class HTTPTransportCompatibilityTests(unittest.TestCase):
                 dict(response.headers.items()),
             )
 
-    def test_handler_keeps_transport_errors_and_threaded_behavior_compatible(
+    def test_handler_returns_standard_errors_and_serves_concurrently(
         self,
     ) -> None:
         self.assertIsInstance(self.server, ThreadingHTTPServer)

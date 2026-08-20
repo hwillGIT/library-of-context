@@ -1,9 +1,9 @@
 # Code of Conduct
 
-## Our standard
+## Community standard
 
-We want a rigorous, welcoming community where people can question assumptions and
-improve the design together. Participants are expected to:
+The project expects a rigorous, welcoming community where people can question
+assumptions and improve the design together. Participants must:
 
 - communicate respectfully and in good faith;
 - critique ideas and evidence rather than people;
