@@ -7,12 +7,11 @@ from .models import ContextRecord, SearchHit, WorkingSet
 from .swapper import ContextSwapper
 
 if TYPE_CHECKING:
-    from .governor import LibraryContextGovernor
     from .session import VirtualContextSession
 
 
 class ReadingDesk(ContextSwapper):
-    """The bounded active context: books are replaced, never accumulated forever."""
+    """Token-bounded active context whose contents are replaced during refresh."""
 
     def lay_out(
         self,
@@ -53,7 +52,7 @@ class ReadingDesk(ContextSwapper):
 
 
 class LibraryOfContext(ContextCache):
-    """Metaphorical public API over the tiered virtual-context memory system."""
+    """Public API for context storage, retrieval, reading desks, and governed prompts."""
 
     def shelve(
         self,
@@ -135,36 +134,4 @@ class LibraryOfContext(ContextCache):
             collection=collection,
             token_budget=token_budget,
             recent_token_budget=recent_token_budget,
-        )
-
-    def open_context_governor(
-        self,
-        session_id: str,
-        *,
-        collection: str | None = None,
-        token_budget: int = 12000,
-        recent_token_budget: int = 4000,
-        protected_token_budget: int = 2000,
-        max_books: int = 12,
-        recent_ring_events: int = 256,
-        work_ring_capacity: int = 1024,
-        worker_poll_seconds: float = 0.1,
-        start_worker: bool = True,
-    ) -> "LibraryContextGovernor":
-        """Open the automatic semantic-paging lifecycle for one agent thread."""
-
-        from .governor import LibraryContextGovernor
-
-        return LibraryContextGovernor(
-            self,
-            session_id,
-            collection=collection,
-            token_budget=token_budget,
-            recent_token_budget=recent_token_budget,
-            protected_token_budget=protected_token_budget,
-            max_books=max_books,
-            recent_ring_events=recent_ring_events,
-            work_ring_capacity=work_ring_capacity,
-            worker_poll_seconds=worker_poll_seconds,
-            start_worker=start_worker,
         )

@@ -4,6 +4,14 @@ The public API is available from `library_of_context` and re-exported from
 `context_cache`. The generated reference below is built directly from source with
 mkdocstrings.
 
+## Existing text-agent adapter
+
+::: context_cache.agent.GovernedTextAgent
+    options:
+      members:
+        - turn
+      inherited_members: false
+
 ## Context governor
 
 ::: context_cache.governor.LibraryContextGovernor

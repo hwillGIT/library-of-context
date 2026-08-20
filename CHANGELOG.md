@@ -5,7 +5,25 @@ once stable release guarantees are established.
 
 ## [Unreleased]
 
-- Benchmark harness and local ANN adapter planned.
+### Added
+
+- `GovernedTextAgent` for adding automatic bounded context to stateless text-agent
+  callbacks.
+- Disposable `library-of-context quickstart` self-test with no Redis, cloud service, or
+  retained data.
+- Normal-user installation and existing-agent integration guides.
+- Acceptance tests for clean-directory installation, process restart recovery, agent
+  isolation, MCP profile correctness, and the documented first-run path.
+
+### Changed
+
+- The Codex MCP template is now project-isolated, virtual-environment-safe,
+  Redis-optional by default, and limited to tools a cooperative host can use correctly.
+- HTTP context status now honors a non-default collection query.
+- CLI, HTTP, MCP, prompt assembly, indexing, retrieval, queue, and token-budget
+  responsibilities now have separate modules with compatibility tests.
+- Query-cache identity now includes the ranker version, ranking policy, and stable
+  embedder configuration.
 
 ## [0.3.0] - 2026-08-20
 

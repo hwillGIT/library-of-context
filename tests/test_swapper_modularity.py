@@ -1,0 +1,158 @@
+from __future__ import annotations
+
+import unittest
+
+from context_cache.embeddings import estimate_tokens
+from context_cache.models import ContextRecord, SearchHit, WorkingSet
+from context_cache.swapper import ContextSwapper
+
+
+def _record(record_id: str, text: str = "fixture context") -> ContextRecord:
+    return ContextRecord(
+        id=record_id,
+        namespace="project",
+        text=text,
+        embedding=[1.0],
+        source="fixture",
+    )
+
+
+def _hit(record_id: str, score: float, text: str = "fixture context") -> SearchHit:
+    return SearchHit(
+        record=_record(record_id, text),
+        score=score,
+        vector_score=score,
+        lexical_score=0.0,
+        importance_score=0.5,
+        recency_score=0.5,
+    )
+
+
+class _CacheStub:
+    namespace = "project"
+    redis = None
+
+    def __init__(
+        self,
+        hits: list[SearchHit],
+        records: dict[str, ContextRecord] | None = None,
+    ) -> None:
+        self.hits = hits
+        self.records = records or {}
+        self.retrieve_calls: list[tuple[str, int, str, dict[str, object] | None]] = []
+        self.get_calls: list[tuple[str, str]] = []
+
+    def retrieve(
+        self,
+        focus: str,
+        *,
+        top_k: int,
+        namespace: str,
+        filters: dict[str, object] | None,
+    ) -> list[SearchHit]:
+        self.retrieve_calls.append((focus, top_k, namespace, filters))
+        return list(self.hits)
+
+    def get(self, record_id: str, *, namespace: str) -> ContextRecord | None:
+        self.get_calls.append((record_id, namespace))
+        return self.records.get(record_id)
+
+
+class ContextSwapperModularityTests(unittest.TestCase):
+    def test_retrieval_orders_pins_then_ranked_hits_and_applies_exclusions(
+        self,
+    ) -> None:
+        cache = _CacheStub(
+            [_hit("ranked-pin", 0.8), _hit("excluded", 0.7), _hit("ranked", 0.6)],
+            {"fetched-pin": _record("fetched-pin")},
+        )
+        swapper = ContextSwapper(cache)  # type: ignore[arg-type]
+
+        ordered = swapper._retrieve_and_order_hits(
+            "topic",
+            namespace="project",
+            top_k=2,
+            filters={"kind": "fact"},
+            pinned_record_ids=["fetched-pin", "ranked-pin"],
+            exclude_record_ids=["excluded", "fetched-pin"],
+        )
+
+        self.assertEqual(
+            [hit.record.id for hit in ordered],
+            ["fetched-pin", "ranked-pin", "ranked"],
+        )
+        self.assertEqual(ordered[0].score, 1.0)
+        self.assertEqual(
+            cache.retrieve_calls,
+            [("topic", 6, "project", {"kind": "fact"})],
+        )
+        self.assertEqual(cache.get_calls, [("fetched-pin", "project")])
+
+    def test_packing_preserves_order_limit_and_estimated_token_budget(self) -> None:
+        ordered = [
+            _hit("first", 0.9, "x" * 400),
+            _hit("second", 0.8, "second context"),
+        ]
+
+        selected, context = ContextSwapper._pack_hits(
+            ordered,
+            token_budget=20,
+            top_k=2,
+        )
+
+        self.assertEqual([hit.record.id for hit in selected], ["first"])
+        self.assertIn("id=first", context)
+        self.assertNotIn("id=second", context)
+        self.assertLessEqual(estimate_tokens(context), 20)
+
+        selected, _ = ContextSwapper._pack_hits(
+            ordered,
+            token_budget=200,
+            top_k=1,
+        )
+        self.assertEqual([hit.record.id for hit in selected], ["first"])
+
+    def test_swap_diff_preserves_previous_and_selected_order(self) -> None:
+        previous = WorkingSet(
+            session_id="thread",
+            namespace="project",
+            focus="old",
+            hits=[_hit("a", 0.9), _hit("b", 0.8), _hit("c", 0.7)],
+            context="",
+            token_count=0,
+            token_budget=100,
+            refreshed_at=0.0,
+        )
+
+        swapped_in, swapped_out, retained = ContextSwapper._swap_diff(
+            previous,
+            [_hit("c", 0.9), _hit("b", 0.8), _hit("d", 0.7)],
+        )
+
+        self.assertEqual(swapped_in, ["d"])
+        self.assertEqual(swapped_out, ["a"])
+        self.assertEqual(retained, ["c", "b"])
+
+    def test_refresh_preserves_working_set_payload_and_swap_state(self) -> None:
+        cache = _CacheStub([_hit("a", 0.9), _hit("b", 0.8)])
+        swapper = ContextSwapper(cache)  # type: ignore[arg-type]
+
+        first = swapper.refresh("thread", "alpha", token_budget=100, top_k=2)
+        cache.hits = [_hit("b", 0.9), _hit("c", 0.8)]
+        second = swapper.refresh("thread", "beta", token_budget=100, top_k=2)
+
+        self.assertEqual(first.swapped_in, ["a", "b"])
+        self.assertEqual(first.swapped_out, [])
+        self.assertEqual(first.retained, [])
+        self.assertEqual(second.swapped_in, ["c"])
+        self.assertEqual(second.swapped_out, ["a"])
+        self.assertEqual(second.retained, ["b"])
+        self.assertEqual(second.session_id, "thread")
+        self.assertEqual(second.namespace, "project")
+        self.assertEqual(second.focus, "beta")
+        self.assertEqual(second.token_count, estimate_tokens(second.context))
+        self.assertIs(swapper.get("thread"), second)
+
+
+if __name__ == "__main__":
+    unittest.main()

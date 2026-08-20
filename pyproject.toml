@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "library-of-context"
 version = "0.3.0"
-description = "Local-first semantic paging and durable virtual memory for bounded AI context"
+description = "Local-first semantic paging and durable virtual memory for bounded model context"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -26,7 +26,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/hwillGIT/library-of-context"
-Documentation = "https://github.com/hwillGIT/library-of-context/tree/main/docs"
+Documentation = "https://hwillgit.github.io/library-of-context/"
 Issues = "https://github.com/hwillGIT/library-of-context/issues"
 Source = "https://github.com/hwillGIT/library-of-context"
 
@@ -36,14 +36,21 @@ docs = [
     "mkdocstrings[python]>=0.30,<1",
     "ruff>=0.12,<1",
 ]
-dev = ["ruff>=0.12,<1"]
+dev = ["ruff>=0.12,<1", "codespell>=2.4,<3"]
 
 [tool.ruff]
 target-version = "py311"
 line-length = 88
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F", "I"]
+select = ["B", "C90", "E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["C901"]
+
+[tool.codespell]
+skip = ".git,.venv,.ruff_cache,site,*.egg-info,*.sqlite,*.svg"
+ignore-words-list = "nd,crate,recuse"
 
 [project.scripts]
 library-of-context = "context_cache.cli:main"

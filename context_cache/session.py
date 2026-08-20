@@ -6,12 +6,17 @@ from typing import Literal
 from .embeddings import estimate_tokens
 from .library import LibraryOfContext
 from .models import ContextRecord, PromptEnvelope
+from .text_budget import (
+    MESSAGE_TRUNCATION_MARKER,
+    message_token_count,
+    truncate_text,
+)
 
 Role = Literal["system", "user", "assistant", "developer", "tool"]
 
 
 class VirtualContextSession:
-    """Build stateless, bounded model requests over an unbounded disk conversation.
+    """Build bounded, stateless model requests from disk-backed conversation history.
 
     The complete history is shelved in the Library. Each prompt contains only a recent
     window plus a freshly retrieved reading desk, so live input does not grow with the
@@ -89,20 +94,6 @@ class VirtualContextSession:
             used += cost
         return list(reversed(selected))
 
-    @staticmethod
-    def _message_tokens(messages: list[dict[str, str]]) -> int:
-        return sum(estimate_tokens(message["content"]) + 4 for message in messages)
-
-    @staticmethod
-    def _truncate(text: str, token_budget: int) -> str:
-        if estimate_tokens(text) <= token_budget:
-            return text
-        marker = " … [full message remains in the Library]"
-        marker_tokens = estimate_tokens(marker)
-        if token_budget <= marker_tokens:
-            return text[: max(0, token_budget * 4)]
-        return text[: (token_budget - marker_tokens) * 4].rstrip() + marker
-
     def build_prompt(
         self,
         *,
@@ -116,7 +107,7 @@ class VirtualContextSession:
         base_messages = (
             [] if not system_prompt else [{"role": "system", "content": system_prompt}]
         )
-        base_tokens = self._message_tokens(base_messages)
+        base_tokens = message_token_count(base_messages)
         if base_tokens + 64 >= self.token_budget:
             raise ValueError(
                 "system_prompt leaves no room for conversation or retrieval"
@@ -132,7 +123,11 @@ class VirtualContextSession:
         recent_used = 0
         for record in recent:
             remaining = max(1, recent_budget - recent_used - 4)
-            content = self._truncate(record.text, remaining)
+            content = truncate_text(
+                record.text,
+                remaining,
+                marker=MESSAGE_TRUNCATION_MARKER,
+            )
             recent_messages.append(
                 {
                     "role": str(record.metadata.get("role", "user")),
@@ -140,7 +135,7 @@ class VirtualContextSession:
                 }
             )
             recent_used += estimate_tokens(content) + 4
-        reserved = self._message_tokens(base_messages + recent_messages) + 24
+        reserved = message_token_count(base_messages + recent_messages) + 24
         desk_budget = max(64, self.token_budget - reserved)
         working = self.desk.refresh(
             self.session_id,
@@ -165,7 +160,7 @@ class VirtualContextSession:
             else:
                 messages.append({"role": "system", "content": library_block})
         messages.extend(recent_messages)
-        token_count = self._message_tokens(messages)
+        token_count = message_token_count(messages)
         if token_count > self.token_budget and working.context:
             overflow = token_count - self.token_budget
             trim_chars = overflow * 4 + 8
@@ -186,7 +181,7 @@ class VirtualContextSession:
                 }
             else:
                 messages[0] = {"role": "system", "content": library_block}
-            token_count = self._message_tokens(messages)
+            token_count = message_token_count(messages)
         return PromptEnvelope(
             session_id=self.session_id,
             collection=self.collection,

@@ -12,9 +12,9 @@ model(envelope.messages) -> response
 commit(response) -> durable event
 ```
 
-`prepare()` does not merely search the Library. It first commits the user event and its
-outbox entry in one SQLite transaction. Only then does it construct a prompt. This is
-the intervention point that prevents an event from expiring before it is recoverable.
+`prepare()` commits the user event and its outbox entry in one SQLite transaction before
+constructing a prompt. This ordering prevents an event from leaving active context
+before it is recoverable.
 
 ## Python lifecycle
 
@@ -94,6 +94,11 @@ subject to `protected_token_budget`; protection cannot silently break the model'
 input limit. A future policy layer should report omitted protected items as a distinct
 alert when the protected set exceeds its budget.
 
+Automatic protection is disabled by default because it could preserve stale,
+conflicting, or injected instructions and crowd out current evidence. Any future policy
+must explain why an item was protected, show its evidence and release condition, and
+demonstrate improved continuity without increasing stale-instruction failures.
+
 `release(event_id)` removes the protection flag but retains the durable event and its
 searchable book.
 
@@ -103,6 +108,11 @@ Most calls should use the recent overlay and accept asynchronous index visibilit
 `strict_freshness=True` waits until the thread's index reaches its recorded watermark.
 It fails with a timeout if that boundary is not reached. Use it for explicit audit or
 retrieval tests, not as the default interactive path.
+
+This is a deadline-bounded wait, not an unconditional guarantee under overload. The
+current per-governor workers can encounter unrelated global outbox work. A multi-agent
+daemon needs atomic claims, thread partitions, and priority policy before it can offer a
+stronger freshness service level.
 
 ## Work-ring overflow and recovery
 
@@ -118,6 +128,11 @@ After a restart:
 4. stable record IDs make replay idempotent;
 5. watermarks advance only after the index record is written.
 
+Stable IDs make duplicate work safe for correctness, but duplicate embedding and writes
+still cost resources. Multiple workers therefore require atomic claim/lease/reclaim,
+retry classification, jitter, and poison-event quarantine before the outbox is treated
+as a workstation-scale queue.
+
 ## MCP operations
 
 The STDIO MCP server exposes:
@@ -130,8 +145,10 @@ The STDIO MCP server exposes:
 - `library_context_flush`
 
 These tools make the lifecycle available to an external gateway. They do not grant an
-MCP server control over a host's internal context manager. Without a host hook, an agent
-must call them cooperatively.
+MCP server control over a host's internal context manager. A normal MCP agent can use
+the Library and desk tools cooperatively, but calling `prepare` inside an already active
+model turn cannot bound that same turn. Automatic enforcement requires a client that
+owns the next model call and sends only the returned messages.
 
 ## HTTP operations
 
@@ -139,9 +156,9 @@ Equivalent loopback endpoints use `/context/prepare`, `/context/commit`,
 `/context/protect`, `/context/release`, `/context/flush`, and
 `/context/status/{session}`.
 
-The server is intentionally unauthenticated for local development. Do not bind or proxy
-it to a shared network without adding authentication, authorization, request limits,
-TLS, and privacy policy enforcement.
+The local development server has no authentication. Do not bind or proxy it to a shared
+network without adding authentication, authorization, request limits, TLS, and privacy
+policy enforcement.
 
 ## Integration checklist
 
@@ -156,3 +173,6 @@ A correct gateway must:
 - expose watermark lag and worker errors;
 - retain native provider compaction only as an emergency fallback;
 - test crash recovery between append, model call, commit, and index completion.
+
+The rationale, costs, and adoption triggers for these future policies are documented in
+[Why These Improvements?](WHY_THE_ROADMAP.md).

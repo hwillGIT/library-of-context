@@ -20,7 +20,7 @@ class Embedder(Protocol):
 
 
 def estimate_tokens(text: str) -> int:
-    """Cheap, conservative token estimate suitable for context budgeting."""
+    """Estimate tokens as ``ceil(character_count / 4)``; not model-specific."""
     if not text:
         return 0
     return max(1, math.ceil(len(text) / 4))
@@ -36,8 +36,9 @@ def normalize(vector: list[float]) -> list[float]:
 class HashingEmbedder:
     """Dependency-free local embedding baseline using signed feature hashing.
 
-    It is deterministic and surprisingly useful for topical/lexical recall. Replace it
-    with a semantic embedder for production without changing the rest of the system.
+    The output is deterministic and supports lexical and topical similarity.
+    Applications that require model-based semantic similarity can supply another
+    embedder.
     """
 
     def __init__(self, dimensions: int = 384, include_bigrams: bool = True) -> None:
@@ -54,7 +55,9 @@ class HashingEmbedder:
         tokens = [token.lower() for token in TOKEN_RE.findall(text)]
         if not self.include_bigrams:
             return tokens
-        return tokens + [f"{left}::{right}" for left, right in zip(tokens, tokens[1:])]
+        return tokens + [
+            f"{left}::{right}" for left, right in zip(tokens, tokens[1:], strict=False)
+        ]
 
     def _one(self, text: str) -> list[float]:
         vector = [0.0] * self.dimensions

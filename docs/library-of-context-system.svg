@@ -38,7 +38,7 @@
   <circle cx="90" cy="900" r="190" fill="#f1ddbd" opacity=".5"/>
 
   <text x="80" y="78" class="serif ink" font-size="52" font-weight="700">The Library of Context</text>
-  <text x="82" y="118" class="sans muted" font-size="23">Virtual memory for an AI: a very large local library, a deliberately small reading desk.</text>
+  <text x="82" y="118" class="sans muted" font-size="23">External context memory with a bounded model reading desk.</text>
 
   <g filter="url(#shadow)">
     <rect x="80" y="185" width="430" height="490" rx="26" class="panel"/>

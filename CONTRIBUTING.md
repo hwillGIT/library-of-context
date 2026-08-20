@@ -18,15 +18,29 @@ Changes must preserve these invariants:
 
 Read [ARCHITECTURE.md](ARCHITECTURE.md) and
 [docs/CONTEXT_GOVERNOR.md](docs/CONTEXT_GOVERNOR.md) before changing the lifecycle.
+Read [Why These Improvements?](docs/WHY_THE_ROADMAP.md) before implementing a roadmap
+item. Each item has an adoption trigger and an evidence gate.
 
 ## Development setup
+
+Windows PowerShell:
+
+```powershell
+git clone https://github.com/hwillGIT/library-of-context.git
+cd library-of-context
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+macOS or Linux:
 
 ```bash
 git clone https://github.com/hwillGIT/library-of-context.git
 cd library-of-context
-python -m venv .venv
-python -m pip install -e .
-python -m unittest discover -s tests -v
+python3 -m venv .venv
+.venv/bin/python -m pip install -e .
+.venv/bin/python -m unittest discover -s tests -v
 ```
 
 No external dependency or Redis service is needed for the default test suite. To run
@@ -34,7 +48,7 @@ the live Redis integration test:
 
 ```powershell
 $env:CONTEXT_CACHE_TEST_REDIS = "1"
-python -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
 Do not run this against a shared production Redis instance.
@@ -62,6 +76,12 @@ topology, scope/ACL routing, knowledge promotion, and team broker selection.
 An RFC should explain the problem, constraints, at least two viable options, failure
 modes, migration path, security implications, performance/quality evaluation, and open
 questions.
+
+For a substantial improvement, copy the
+[Improvement Decision Brief Template](docs/DECISION_BRIEF_TEMPLATE.md). The brief must
+include both **why** and **why not**, non-goals, the option to defer, a measurable adoption
+trigger, an evidence gate, new failure modes, compatibility, rollback, and operational
+ownership. “This architecture is more scalable” is not an adoption trigger.
 
 ## Pull requests
 

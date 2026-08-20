@@ -207,6 +207,45 @@ class GovernorHTTPTests(unittest.TestCase):
                 library.close()
                 thread.join(timeout=2)
 
+    def test_status_respects_a_non_default_collection(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            library = LibraryOfContext(Path(directory) / "library.sqlite", redis_url="")
+            server, swapper = create_server(library, "127.0.0.1", 0)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            base = f"http://127.0.0.1:{server.server_address[1]}"
+
+            request = urllib.request.Request(
+                base + "/context/prepare",
+                data=json.dumps(
+                    {
+                        "session_id": "isolated",
+                        "collection": "project-a",
+                        "user_message": "Keep this inside project A.",
+                        "token_budget": 500,
+                        "recent_token_budget": 120,
+                        "protected_token_budget": 80,
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=3) as response:
+                    self.assertEqual(response.status, 200)
+                with urllib.request.urlopen(
+                    base + "/context/status/isolated?collection=project-a", timeout=3
+                ) as response:
+                    status = json.loads(response.read())
+                self.assertEqual(status["collection"], "project-a")
+                self.assertEqual(status["watermarks"]["recorded_through"], 1)
+            finally:
+                server.shutdown()
+                server.server_close()
+                swapper.close()
+                library.close()
+                thread.join(timeout=2)
+
 
 if __name__ == "__main__":
     unittest.main()

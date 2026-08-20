@@ -2,11 +2,11 @@
 
 ![The Library of Context virtual-memory architecture](library-of-context-system.svg)
 
-The Library of Context makes a model’s usable history larger without making every
-model request larger. Complete conversations, documents, decisions, and tool results
-live outside the prompt in a local library. A retrieval-and-paging layer selects only
-the books relevant to the current subject and places them on a fixed-size “reading
-desk.” When the subject changes, the desk is replaced.
+The Library of Context increases addressable history without making every model request
+larger. Recorded conversations, documents, decisions, and tool results live outside the
+prompt in a local library. A retrieval-and-paging layer selects a bounded set for the
+current subject and places it on a fixed-size “reading desk.” When the subject changes,
+the desk is replaced.
 
 ## The metaphor
 
@@ -65,7 +65,7 @@ outbox preserves the work for recovery.
 2. **Consult:** the current subject becomes a catalog query. The engine combines vector
    similarity, SQLite FTS rank, explicit importance, and recency.
 3. **Pack:** pinned books go first. Ranked books fill the remaining token budget. An
-   oversized final book is truncated to the exact remaining allowance.
+   oversized final book is truncated to the remaining estimated-token allowance.
 4. **Swap:** the engine compares the new selection with the previous desk and reports
    `swapped_in`, `swapped_out`, and `retained`.
 5. **Read:** only protected state, the bounded recent ring, and the replacement desk are
@@ -91,7 +91,7 @@ again.
 
 ## Hybrid RAG ranking
 
-The default score is intentionally inspectable:
+The default score uses fixed, documented weights:
 
 ```text
 0.60 × normalized cosine similarity
@@ -101,13 +101,13 @@ The default score is intentionally inspectable:
 ```
 
 Metadata filters can restrict retrieval to a project, user, agent, source, or security
-boundary. The included hashing embedder is private and dependency-free; an Ollama
-adapter is included for stronger local semantic embeddings.
+boundary. The included hashing embedder runs locally and has no external service
+dependency; the Ollama adapter provides model-based semantic embeddings.
 
 ## Free local Redis on Windows—no Docker
 
-This workstation uses Redis 7 inside Ubuntu WSL. Installation and cache policy are
-automated by:
+The provided Windows installer runs Redis 7 inside Ubuntu WSL and configures its cache
+policy:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install-local-redis.ps1
@@ -122,25 +122,27 @@ wsl -d Ubuntu -- redis-cli ping
 python -m library_of_context doctor
 ```
 
-No Docker subscription or cloud account is required. A managed Redis endpoint can be
+This setup requires neither Docker nor a cloud account. A managed Redis endpoint can be
 used later by changing `LIBRARY_OF_CONTEXT_REDIS_URL`; private context would then cross
 the local-machine boundary and should be protected with an authenticated TLS proxy or a
 client that supports `rediss://`.
 
-## Codex integration
+## Agent integration
 
-The dependency-free STDIO MCP server exposes three groups of tools:
+The dependency-free STDIO MCP server exposes Library, desk, and governor tool groups.
+The safe integration depends on who owns the model call:
 
-- shelving and catalog search;
-- immediate or periodic reading-desk replacement;
-- governed `prepare → model → commit` prompt construction and message recording.
+- A normal MCP agent uses shelving, catalog search, and reading-desk replacement as
+  cooperative memory. It does not control native transcript growth.
+- A custom gateway uses governed `prepare → model → commit` operations and sends only
+  the returned messages as the complete request.
 
-Copy `integrations/codex-config.toml.example` into a trusted project’s
-`.codex/config.toml`, adjust its absolute `cwd`, and restart the local Codex client. The
-server’s initialization instructions explicitly say to refresh at task start or focus
-change and to replace—not append—the prior desk.
+The Codex template allowlists only the cooperative tools. Copy it into a
+trusted project's `.codex/config.toml`, choose a project-specific database and
+namespace, merge the supplied instructions into the target `AGENTS.md`, and restart the
+local client. See [Add the Library to your agent](ADD_TO_YOUR_AGENT.md).
 
-The direct loop is:
+The automatic gateway loop is:
 
 ```text
 prepare and durably record → build bounded prompt → call model

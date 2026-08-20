@@ -1,6 +1,6 @@
 site_name: The Library of Context
 site_url: https://hwillgit.github.io/library-of-context/
-site_description: Local-first semantic paging and durable virtual memory for bounded AI context
+site_description: Local-first semantic paging and durable virtual memory for bounded model context
 repo_url: https://github.com/hwillGIT/library-of-context
 repo_name: hwillGIT/library-of-context
 edit_uri: edit/main/docs/
@@ -84,15 +84,20 @@ extra_css:
 
 nav:
   - Home: index.md
+  - Getting started: GETTING_STARTED.md
+  - Add to your agent: ADD_TO_YOUR_AGENT.md
   - Concepts:
+      - Capability status: STATUS.md
       - System explainer: LIBRARY_OF_CONTEXT_EXPLAINER.md
       - Architecture: architecture.md
       - Context governor: CONTEXT_GOVERNOR.md
   - Scaling:
+      - Why these improvements?: WHY_THE_ROADMAP.md
       - Performance and scaling: PERFORMANCE_AND_SCALING.md
       - Team architecture: TEAM_ARCHITECTURE.md
       - Roadmap and research: roadmap.md
   - Reference:
       - Python API: API_REFERENCE.md
+      - Decision brief template: DECISION_BRIEF_TEMPLATE.md
       - Contributing: contributing.md
       - Security: security.md

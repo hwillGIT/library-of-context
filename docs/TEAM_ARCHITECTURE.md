@@ -1,7 +1,17 @@
 # Local-First Team Architecture
 
-The Library is designed first for local agent threads. Team scale should extend that
-model without turning a remote service into a dependency of every prompt.
+Version 0.3 supports local agent threads. Team scaling must not make a remote service a
+dependency of every prompt.
+
+> [!NOTE]
+> The topology below is a proposal. Team sync, shared authorization, promotion
+> workflows, and brokers are not implemented in version 0.3. The local event/outbox and
+> context-governor foundation is implemented.
+
+The team plane is conditional, not the destination of every installation. A solo user
+should not need identity infrastructure or a broker. See
+[Why These Improvements?](WHY_THE_ROADMAP.md) for the decision triggers and skeptical
+case for each major subsystem.
 
 ## Scope hierarchy
 
@@ -75,6 +85,20 @@ are valid alternatives. In every case:
 - trim only behind acknowledged watermarks;
 - preserve the SQLite outbox/inbox as each node's recovery truth.
 
+### Why a broker—and why not yet
+
+A broker becomes useful when independently failing nodes need replay, several consumers
+need the same events, or polling load and visibility delay exceed the declared sync SLO.
+It also introduces retention, poison-event handling, consumer recovery, upgrades,
+backups, monitoring, and an on-call responsibility. It does not solve promotion policy,
+identity, authorization, deletion, or semantic conflicts.
+
+The first small-team implementation can use authenticated batch push/pull against a
+durable team event table with per-node cursors. Add a broker only after promotion and
+authorization semantics are stable and measured fan-out, event rate, or offline replay
+requirements justify it. Redis Streams must use a separate persistence-enabled service;
+the disposable LFU cache remains unsuitable.
+
 ## Promotion compiler
 
 Instead of synchronizing every prompt, a promotion compiler can turn local work into a
@@ -103,6 +127,12 @@ principal, scope, source version, and tombstone predicates must constrain FTS/AN
 candidate generation before text hydration. Cache keys include an authorization
 fingerprint, and permission revocation invalidates affected entries immediately.
 
+“Immediately” applies to connected nodes with current policy. A disconnected node
+cannot learn about a revocation. A deployment must choose short-lived signed
+authorization leases that fail closed after expiry, or document a maximum revocation
+lag and its bounded risk. Indefinite offline access and immediate revocation cannot both
+be promised.
+
 A shared deployment requires:
 
 - device and user identity;
@@ -120,19 +150,29 @@ Preserve order only inside `(project_id, thread_id)` partitions. Global order is
 expensive and unnecessary. Stable event IDs make duplicate delivery safe. Each node
 tracks recorded, indexed, and team-synced watermarks.
 
+One monotonic per-thread sequence also implies one active sequence owner. Two offline
+devices cannot allocate the same global sequence safely without a lease. The initial
+team design should use a single-writer thread lease; a future multi-writer design needs
+device-local sequences, causal metadata, and explicit conflict ordering.
+
 Thread branches can reference `parent_thread_id` plus a parent sequence or context
 snapshot. Merging should promote explicit decisions or cards rather than concatenate
 two raw transcripts.
 
 ## Options and trade-offs
 
-| Option | Offline | Privacy | Team scale | Complexity | Recommended use |
-|---|---:|---:|---:|---:|---|
-| Enhanced local process | High | High | Low | Low | Solo prototype |
-| Local daemon + rings/outbox | High | High | Medium | Medium | Next implementation stage |
-| Federated peer nodes | High | Medium-high | Medium-high | Very high | Privacy-constrained small teams |
-| Local nodes + shared control plane | High | Medium-high | High | High | Recommended team evolution |
-| Cloud-central prompt memory | Low | Low-medium | High | Medium | Not recommended as primary path |
+| Option | Choose when | Avoid when | Main cost |
+|---|---|---|---|
+| Embedded local process | One process or small solo workload meets its SLOs | Several agents duplicate workers and memory | Limited cross-process coordination |
+| Local daemon + rings/outbox | Workstation contention or shared quotas are measured | One embedded process is sufficient | Supervision, IPC, and local SPOF |
+| Federated peer nodes | Organizational constraints prohibit a shared catalog | The team cannot own discovery, conflict, and revocation complexity | Highest distributed-systems burden |
+| Local nodes + shared control plane | Several principals need policy, audit, and promoted search | Manual or one-database sync still meets the need | Service cost, privacy expansion, operations |
+| Cloud-central prompt memory | Only when offline/local independence is not required | For the Library's primary local-first promise | Network dependency and centralized raw context |
+
+The candidate distributed-team topology uses local nodes plus an optional shared control
+plane. Remote services remain outside prompt construction. A trusted small team should
+first test reviewed cards and a durable sync API; add a cloud or broker layer only after
+measured fan-out, replay, or coordination requirements exceed the local design.
 
 ## Open collaboration questions
 
