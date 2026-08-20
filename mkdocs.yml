@@ -1,0 +1,98 @@
+site_name: The Library of Context
+site_url: https://hwillgit.github.io/library-of-context/
+site_description: Local-first semantic paging and durable virtual memory for bounded AI context
+repo_url: https://github.com/hwillGIT/library-of-context
+repo_name: hwillGIT/library-of-context
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 Library of Context contributors
+
+theme:
+  name: material
+  logo: library-of-context-system.svg
+  favicon: library-of-context-system.svg
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.action.edit
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: google
+            filters: ["!^_"]
+            show_source: true
+            show_root_heading: true
+            show_symbol_type_heading: true
+            show_signature_annotations: true
+            separate_signature: true
+            members_order: source
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+extra_css:
+  - stylesheets/extra.css
+
+nav:
+  - Home: index.md
+  - Concepts:
+      - System explainer: LIBRARY_OF_CONTEXT_EXPLAINER.md
+      - Architecture: architecture.md
+      - Context governor: CONTEXT_GOVERNOR.md
+  - Scaling:
+      - Performance and scaling: PERFORMANCE_AND_SCALING.md
+      - Team architecture: TEAM_ARCHITECTURE.md
+      - Roadmap and research: roadmap.md
+  - Reference:
+      - Python API: API_REFERENCE.md
+      - Contributing: contributing.md
+      - Security: security.md

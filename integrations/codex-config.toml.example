@@ -1,0 +1,30 @@
+# Copy this table into a trusted project's .codex/config.toml, then replace cwd
+# with the absolute path to this repository. This file is a template and is not active.
+[mcp_servers.library_of_context]
+command = "python"
+args = [
+  "-m",
+  "library_of_context.mcp_server",
+  "--db",
+  "data/library-of-context.sqlite",
+  "--ram-mb",
+  "2048",
+]
+cwd = "C:/absolute/path/to/library-of-context"
+startup_timeout_sec = 10
+tool_timeout_sec = 120
+enabled = true
+required = false
+default_tools_approval_mode = "writes"
+enabled_tools = [
+  "library_shelve",
+  "library_shelve_document",
+  "library_consult",
+  "library_desk_refresh",
+  "library_desk_get",
+  "library_desk_watch",
+  "library_desk_stop",
+  "library_message_record",
+  "library_prompt_build",
+  "library_stats",
+]

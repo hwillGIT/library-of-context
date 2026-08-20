@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "library-of-context"
+version = "0.3.0"
+description = "Local-first semantic paging and durable virtual memory for bounded AI context"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Library of Context contributors" }]
+dependencies = []
+keywords = ["ai", "agents", "context", "rag", "sqlite", "redis", "mcp"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.urls]
+Homepage = "https://github.com/hwillGIT/library-of-context"
+Documentation = "https://github.com/hwillGIT/library-of-context/tree/main/docs"
+Issues = "https://github.com/hwillGIT/library-of-context/issues"
+Source = "https://github.com/hwillGIT/library-of-context"
+
+[project.optional-dependencies]
+docs = [
+    "mkdocs-material>=9.7,<10",
+    "mkdocstrings[python]>=0.30,<1",
+    "ruff>=0.12,<1",
+]
+dev = ["ruff>=0.12,<1"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[project.scripts]
+library-of-context = "context_cache.cli:main"
+library-of-context-mcp = "context_cache.mcp_server:main"
+context-cache = "context_cache.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["context_cache*", "library_of_context*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -1,0 +1,34 @@
+name: Research question
+description: Invite evidence and multiple design options for an open problem
+title: "[Research]: "
+labels: [research]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: State one answerable design or evaluation question.
+    validations:
+      required: true
+  - type: textarea
+    id: importance
+    attributes:
+      label: Why it matters
+      description: Which agent, user, reliability, privacy, or scaling outcome depends on it?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Existing evidence
+      description: Measurements, papers, implementations, or observations already available.
+  - type: textarea
+    id: options
+    attributes:
+      label: Candidate approaches
+      description: List competing options and important contradictions.
+  - type: textarea
+    id: experiment
+    attributes:
+      label: Proposed experiment or decision rule
+      description: What result would distinguish the options?

@@ -1,0 +1,31 @@
+:root {
+  --loc-ink: #211a33;
+  --loc-violet: #5b3cc4;
+  --loc-amber: #f2a900;
+}
+
+.loc-hero {
+  padding: 1.4rem 1.5rem;
+  margin: 0 0 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--loc-violet) 32%, transparent);
+  border-radius: 0.75rem;
+  background:
+    radial-gradient(circle at 92% 12%, rgba(242, 169, 0, 0.18), transparent 35%),
+    linear-gradient(135deg, rgba(91, 60, 196, 0.13), rgba(91, 60, 196, 0.03));
+}
+
+.loc-hero > p:first-child {
+  margin-top: 0;
+  font-size: 1.25rem;
+}
+
+[data-md-color-scheme="slate"] .loc-hero {
+  border-color: rgba(181, 157, 255, 0.3);
+  background:
+    radial-gradient(circle at 92% 12%, rgba(242, 169, 0, 0.15), transparent 35%),
+    linear-gradient(135deg, rgba(116, 82, 217, 0.24), rgba(38, 31, 59, 0.15));
+}
+
+.md-typeset .grid.cards > ul > li {
+  border-top: 3px solid var(--loc-violet);
+}
