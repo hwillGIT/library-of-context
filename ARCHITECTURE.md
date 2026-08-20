@@ -13,6 +13,9 @@ The system preserves every event recorded through the governor and constructs a 
 working set for each governed call. It increases addressable context, not the model's
 physical input limit.
 
+See [Related Work and Design Landscape](docs/RELATED_WORK.md) for comparative evidence.
+[Capability Status](docs/STATUS.md) remains the authority for shipped behavior.
+
 ## Core invariants
 
 1. **Durable before evictable.** An event is committed to SQLite before the governor may

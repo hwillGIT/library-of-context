@@ -29,6 +29,8 @@ prepare(user event) -> bounded messages -> model -> commit(response)
 
 This is an alternative to making a compacted transcript the only continuation state.
 Original events remain recoverable, while the model sees a fresh bounded working set.
+The [related-work landscape](RELATED_WORK.md) places this boundary alongside long-context
+models, retrieval, compaction, agent memory, checkpointing, and runtime paging.
 
 ## What you get
 
