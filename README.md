@@ -41,6 +41,12 @@ Library:      durable event log -> bounded recent/protected context
 Original events remain inspectable and recoverable. Summaries may become navigation
 aids, but they do not need to be the only surviving copy.
 
+The [related-work landscape](docs/RELATED_WORK.md) compares this design with model
+long-context methods, retrieval, prompt compression, provider compaction, agent memory,
+checkpointing, and inference-runtime paging. Here, “compaction” means a smaller,
+potentially lossy continuation representation whose originals are not independently
+addressable unless another layer retains them.
+
 ## What is implemented
 
 - A **context governor** with `prepare -> model call -> commit` lifecycle operations.
@@ -277,6 +283,7 @@ evidence gates.
 | Document | Purpose |
 |---|---|
 | [Architecture](ARCHITECTURE.md) | Invariants, tiers, consistency, and evolution |
+| [Related Work and Design Landscape](docs/RELATED_WORK.md) | Primary-source comparison with adjacent context and memory approaches |
 | [Context Governor](docs/CONTEXT_GOVERNOR.md) | Prepare/commit protocol and failure behavior |
 | [Capability Status](docs/STATUS.md) | Implemented, experimental, planned, and unsupported boundaries |
 | [System Explainer](docs/LIBRARY_OF_CONTEXT_EXPLAINER.md) | Didactic visual walkthrough |

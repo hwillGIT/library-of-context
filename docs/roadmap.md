@@ -8,6 +8,8 @@ The sequence is not a mandate for every deployment. Evidence and correctness wor
 foundational; ANN and a daemon respond to different measured pressures; context
 intelligence is research; and the team plane is optional. The full rationale and
 counterarguments are in [Why These Improvements?](WHY_THE_ROADMAP.md).
+The [related-work landscape](RELATED_WORK.md) supplies comparative evidence;
+inclusion there is neither adoption nor a roadmap commitment.
 
 ## Near-term sequence
 

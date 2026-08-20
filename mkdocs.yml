@@ -91,6 +91,7 @@ nav:
       - System explainer: LIBRARY_OF_CONTEXT_EXPLAINER.md
       - Architecture: architecture.md
       - Context governor: CONTEXT_GOVERNOR.md
+      - Related work and landscape: RELATED_WORK.md
   - Scaling:
       - Why these improvements?: WHY_THE_ROADMAP.md
       - Performance and scaling: PERFORMANCE_AND_SCALING.md

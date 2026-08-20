@@ -6,6 +6,9 @@ The Library controls context over-expansion and over-expiration without replacin
 model's native context. It uses the native window as a bounded working set and stores the
 larger addressable history in local memory and disk.
 
+See [Related Work and Design Landscape](RELATED_WORK.md) for comparative evidence.
+[Capability Status](STATUS.md) remains the authority for shipped behavior.
+
 ## Invariants
 
 1. An event is durable before it may leave the prompt.

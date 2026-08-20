@@ -11,6 +11,8 @@ research. Milestone 5 exists only for teams that need cross-workstation knowledg
 Read [Why These Improvements?](docs/WHY_THE_ROADMAP.md) for the affirmative case,
 skeptical case, alternatives, adoption triggers, and evidence gates. New substantial
 proposals should use the [decision brief template](docs/DECISION_BRIEF_TEMPLATE.md).
+The [related-work landscape](docs/RELATED_WORK.md) supplies comparative evidence;
+inclusion there is neither adoption nor a roadmap commitment.
 
 ## Shipped foundation — 0.3
 
