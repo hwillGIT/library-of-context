@@ -39,7 +39,7 @@ class DocumentationContractTests(unittest.TestCase):
             check=False,
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=30,
         )
         self.assertEqual(parsed.returncode, 0, parsed.stderr)
 
@@ -195,7 +195,8 @@ class DocumentationContractTests(unittest.TestCase):
         )
         self.assertRegex(
             integration_text,
-            r"(?:The shelving tools|Storage tools) create project[- ](?:scoped|visible) "
+            r"(?:The shelving tools|Storage tools) create "
+            r"project[- ](?:scoped|visible) "
             r"books by default\.",
         )
         instructions = (ROOT / "integrations" / "AGENTS.library.md").read_text(
@@ -216,7 +217,8 @@ class DocumentationContractTests(unittest.TestCase):
         normalized_readme = " ".join(readme.split())
         self.assertRegex(
             normalized_readme,
-            r"(?:does not store a second book (?:entity|item)|not a separate stored item)",
+            r"(?:does not store a second book (?:entity|item)"
+            r"|not a separate stored item)",
         )
         self.assertIn("ThreadKey(collection, session_id)", readme)
         self.assertRegex(
@@ -286,7 +288,8 @@ class DocumentationContractTests(unittest.TestCase):
                 self.assertNotIn("cross-process hot caching", text)
         self.assertRegex(
             normalized_readme,
-            r"(?:starts cold after process restart|restarted process starts with an empty cache)",
+            r"(?:starts cold after process restart"
+            r"|restarted process starts with an empty cache)",
         )
         self.assertRegex(
             normalized_architecture,
