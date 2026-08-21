@@ -1,27 +1,25 @@
 # Why These Improvements?
 
-Each roadmap item is conditional. Adoption requires an observed workload or failure, a
-measurable acceptance criterion, comparison with simpler options, and a rollback path.
+Each roadmap item is conditional. Adoption requires an observed problem, a measurable
+criterion, comparison with simpler options, and a rollback path. The
+[glossary](GLOSSARY.md) defines shared terms.
 
-## The decision rule
+## Decision rule
 
-Before adding a subsystem, ask six questions:
+Ask these questions before you add a subsystem:
 
-1. **What observed problem does the subsystem solve?** Name the workload, failure, or
-   quality error. “It may scale someday” is not enough.
-2. **Which invariant is at risk?** Examples are prompt bounds, durable-before-evictable
-   ordering, recent-event visibility, privacy, or local independence.
-3. **What is the smallest viable change?** An index or query fix may remove the need for
-   a separate service.
-4. **What failure modes does it introduce?** Every cache, worker, broker, summary, and
-   shared service adds state that can become stale, unavailable, or inconsistent.
-5. **Which acceptance criterion determines success?** Performance changes need
-   retrieval-quality evidence; context-policy changes need continuity and contradiction
-   tests.
-6. **Can it be disabled or rolled back?** Optional adapters and derived indexes should
-   not own the only copy of context.
+1. What observed problem does it solve? Name the workload, failure, or quality error.
+2. Which invariant is at risk? Relevant invariants include prompt bounds, durability,
+   visibility, privacy, and local operation.
+3. What is the smallest viable change? A query repair can remove the need for a
+   service.
+4. Which failures does it introduce? Each cache, worker, broker, summary, or service can
+   become stale or unavailable.
+5. Which criterion defines success? Performance work needs retrieval-quality evidence.
+6. Can operators disable or reverse it? Optional components must not own the only
+   context copy.
 
-The default preference is therefore:
+Use this default sequence:
 
 ```text
 measure -> repair correctness -> remove unnecessary work -> add bounded concurrency
@@ -32,541 +30,500 @@ measure -> repair correctness -> remove unnecessary work -> add bounded concurre
 
 | Class | Meaning | Examples |
 |---|---|---|
-| Correctness | Required when the affected path is used | Complete cache identity; authorization before shared retrieval |
-| Evidence | Required before making scale or quality claims | Benchmarks, retrieval evaluations, queue and recovery metrics |
-| Scale-triggered | Add only after a declared local workload crosses a measured limit | Approximate nearest-neighbor search; workstation daemon |
-| Optional accelerator | Useful in some environments, never authoritative | Local Redis; pooled embedding connections |
-| Team-only | Has no place in the minimum solo installation | Identity, durable team broker, promotion workflow |
-| Research | Requires evaluation before it becomes a default policy | Automatic protection, state capsules, branch merging |
+| Correctness | Required when the affected path operates | Complete cache identity and authorization before shared retrieval |
+| Evidence | Required before scale or quality claims | Benchmarks, retrieval tests, queue metrics, and recovery metrics |
+| Scale-triggered | Added after a measured local limit | Approximate search and a workstation daemon |
+| Optional accelerator | Useful in some environments and never authoritative | Local Redis and pooled connections |
+| Team-only | Excluded from the minimum solo installation | Identity, team broker, and promotion workflow |
+| Research | Evaluated before default use | Automatic protection, state capsules, and branch merging |
 
-Terms used below: **ANN** means approximate nearest-neighbor vector search; **FTS** means
-full-text search; a **service-level objective (SLO)** is a measurable operating target;
-**IPC** means local interprocess communication; and a **recovery point objective (RPO)**
-states how much committed data a failure is allowed to lose.
+Approximate nearest neighbor (ANN) search provides bounded vector candidates. Full-text
+search (FTS) provides lexical candidates. A service-level objective (SLO) is a
+measurable operating target.
 
-## Summary decision table
+Interprocess communication (IPC) carries messages between local processes. A recovery
+point objective (RPO) limits allowed committed-data loss. A recovery time objective
+(RTO) limits recovery duration.
 
-| Subsystem or policy | Technical purpose | Cost or risk | Evidence or trigger |
+## Summary decisions
+
+| Subsystem or policy | Purpose | Main cost or risk | Trigger |
 |---|---|---|---|
-| Reproducible benchmarks | Prevent confident changes based on anecdotes | Harnesses can become expensive and unrepresentative | Before performance claims or architectural thresholds |
-| Model-aware tokenization | Make the prompt bound true for the selected model | Adds provider/version coupling and dependencies | Estimator violations or production use with a known model |
-| Complete cache and index identity | Prevent stale or incorrectly ranked cache hits | Longer identities reduce hit rate and require migration | Required before configurable ranking or multiple index/model versions |
-| Bounded hybrid search and ANN | Make cold retrieval work independent of catalog size | ANN is approximate and adds an index lifecycle | Exact search misses the declared latency or memory SLO |
-| Batched asynchronous indexing | Keep append latency independent of embedding work | Introduces lag, retry, ordering, and backpressure concerns | Sustained ingest or embedding latency breaks append/visibility SLOs |
-| Outbox claims and poison-work policy | Prevent duplicate work and infinite retry loops | Adds leases, expiry, quarantine, and operator decisions | Multiple workers or external embedders consume the outbox |
-| Atomic source versions | Prevent readers seeing empty or partial document editions | Temporarily uses more storage and needs garbage collection | Sources are replaced while queries are active |
-| Diversity and duplicate suppression | Spend the desk budget on distinct useful evidence | Can suppress corroboration or adjacent context | Measured redundancy harms evidence coverage |
-| One workstation daemon | Share caches and workers across local agents | Adds a supervised process, IPC, and a local failure boundary | Multiple agent processes duplicate memory/work or contend materially |
-| Fixed workers and admission control | Bound concurrency and protect interactive work | Queues can reject work and require capacity policy | Concurrent load creates head-of-line latency or unbounded threads |
-| Low-cardinality observability | Make latency, lag, saturation, and recovery falsifiable | Telemetry costs resources and can leak sensitive labels | Required for SLO paths; fleet export only for fleet operation |
-| Context capsules and summaries | Surface objectives, decisions, and constraints from long, changing work | Derived text can omit, distort, or preserve stale instructions | Evaluation shows higher continuity scores than raw-event retrieval, with originals retained |
-| Automatic protection policy | Keep critical state resident without manual pinning | Wrongly protected context can crowd out newer truth | Explainable policy outperforms explicit protection on continuity and stale-instruction metrics |
-| Branch and scope routing | Match memory to forks, projects, and user intent | Merge and precedence semantics are difficult | The host supports forks or multiple scopes with observed confusion |
-| Lifecycle adapters | Ensure real model/tool turns pass through the governor correctly | Provider churn and retry/stream semantics increase maintenance | A host exposes a documented request/response intervention point |
-| Local Redis | Share hot data and housekeeping across processes | Another service, duplicated data, eviction, and failure tails | Measured cross-process cache reuse justifies its operating cost |
-| Stronger SQLite durability and backups | Reduce power-loss and machine-loss exposure | Stronger sync increases write latency; backups need lifecycle policy | The deployment declares an RPO that `NORMAL` WAL cannot meet |
-| Selective team promotion | Share durable decisions without sharing every prompt | Approval, provenance, conflict, and privacy work | A team has reusable knowledge that must cross workstations |
-| Authorization-aware retrieval | Prevent cross-project disclosure | Adds identity, policy, index filtering, and cache invalidation | Mandatory before any mixed-trust or multi-user catalog |
-| Durable team broker | Replay and acknowledge cross-node changes | Distributed operations are unnecessary for one machine | More than one node needs offline recovery and observable delivery |
-| Optional cloud control plane | Coordinate identity, policy, and promoted knowledge | Cost, privacy expansion, outages, and accidental critical-path coupling | Remote teams need shared coordination that a LAN host cannot provide |
+| Reproducible benchmarks | Test performance and quality claims | Test data can be expensive or unrepresentative | Before an architecture threshold or performance claim |
+| Model-aware tokenization | Enforce the selected model limit | Provider and version coupling | Estimator failures or a known production model |
+| Complete cache identity | Prevent stale or unauthorized hits | Lower cache reuse and migration work | Before configurable ranking or multiple index versions |
+| Bounded hybrid search | Bound cold retrieval work | Approximation and index lifecycle | Exact search exceeds a latency or memory SLO |
+| Batched indexing | Separate append latency from embedding work | Lag, retry, ordering, and backpressure | Embedding work exceeds append or visibility SLOs |
+| Outbox claims | Control duplicate work and repeated failures | Leases, quarantine, and operator action | Multiple workers or external embedders |
+| Atomic source editions | Prevent partial document visibility | Temporary storage and cleanup | Queries overlap source replacement |
+| Diversity controls | Increase distinct evidence | Loss of useful repetition or adjacent context | Measured repetition harms evidence coverage |
+| Workstation daemon | Share local workers and caches | Supervision, IPC, and one failure boundary | Local processes duplicate material work |
+| Fixed workers | Bound concurrency | Rejection and capacity policy | Concurrent load causes unbounded threads or delay |
+| Local metrics | Measure delay, lag, saturation, and recovery | Resource cost and label privacy | Required for each declared SLO path |
+| Context capsules | Surface objectives and decisions | Omission, distortion, and stale instructions | Controlled tests show better continuity than raw retrieval |
+| Automatic protection | Keep critical state in prompts | Stale state can displace current evidence | Explainable policy outperforms explicit protection |
+| Branch routing | Represent forks and scope choices | Complex merge and precedence rules | A host exposes forks or additional scopes |
+| Lifecycle adapters | Apply governor behavior to model calls | Provider changes and retry complexity | A host provides stable request and response hooks |
+| Local Redis | Cache local hot data | Service cost, eviction, and cold restarts | Measured reuse justifies operation |
+| Stronger durability | Reduce machine-loss exposure | Write delay and backup policy | Declared recovery point objective permits less data loss than the baseline profile |
+| Team promotion | Share selected durable knowledge | Approval, origin, conflict, and privacy work | Approved knowledge must cross workstations |
+| Authorized retrieval | Prevent cross-project disclosure | Identity, policy, filtering, and invalidation | Before any mixed-trust catalog |
+| Durable broker | Replay changes across nodes | Distributed operations | Independent nodes need offline recovery |
+| Cloud control plane | Coordinate remote teams | Cost, privacy, outages, and critical-path risk | A remote team needs shared coordination |
 
 ## 1. Measure retrieval and context quality first
 
-### Why
+### Reason
 
-The system has several competing outcomes: low latency, bounded memory, useful recall,
-fresh context, and no unauthorized disclosure. Improving one can damage another. For
-example, an approximate index may make retrieval faster while omitting the decision the
-agent needed. A benchmark and evaluation set makes that trade-off visible.
+The system balances latency, memory, recall, freshness, and privacy. A change can improve
+one measure and damage another. Exact vector scoring provides a deterministic quality
+reference.
 
-Measurements show when the implementation no longer meets its declared target.
-Exact vector scoring is deterministic and provides a retrieval-quality reference. Keep
-it while it meets the declared latency and memory targets.
+### Limits
 
-### Why not build an exhaustive benchmark platform
+An extensive test platform can cost more than the local implementation. Synthetic data
+can reward the wrong query pattern. Metric labels can expose private text.
 
-A synthetic corpus can reward the wrong query distribution, and an extensive harness
-can cost more to maintain than the local implementation. Metrics can also leak prompt
-content if labels contain user or project text.
-
-Start with repeatable command-line workloads, machine-readable results, fixed public or
-synthetic corpora, and low-cardinality metrics. Expand the harness only when a decision
-needs additional evidence.
+Start with repeatable commands, fixed public or synthetic data, machine-readable
+results, and low-cardinality metrics. Expand coverage only for a specific decision.
 
 ### Adopt when
 
-Benchmark coverage is required before changing ranking, candidate generation, token
-packing, queue topology, durability policy, or production-scale claims. Report the
-hardware, corpus, query selectivity, concurrency, cache state, and retrieval quality
-alongside latency.
+Require benchmark coverage before ranking, candidate, token, queue, durability, or
+scale changes. Report hardware, data, selectivity, concurrency, cache state, quality,
+and latency.
 
-## 2. Use model-aware tokenization without making the core provider-specific
+## 2. Use model-aware tokenization through adapters
 
-### Why
+### Reason
 
-The four-characters-per-token estimate is portable but approximate. Code,
-non-Latin text, long unbroken strings, tool payloads, and different model tokenizers can
-violate the intended prompt bound. A context governor that occasionally exceeds its
-budget is not enforcing its most important contract.
+The four-characters-per-token estimate is portable but approximate. Code, non-Latin
+text, long strings, and tool data can exceed an intended prompt limit.
 
-### Why not require one tokenizer
+### Limits
 
-Tokenization varies by model and version. Requiring a provider library would increase
-the core dependency surface, complicate offline installation, and be wrong for a
-different model. Persisted token counts can also become stale after a tokenizer change.
+Tokenization changes by model and version. One required provider library would increase
+offline dependencies. Stored token counts can become stale after a tokenizer change.
 
-### Preferred decision
+### Decision
 
-Keep the conservative estimator as the dependency-free fallback. Add tokenizer
-adapters selected by the caller, record the tokenizer identity with derived counts, and
-always retain a final hard admission check. Adopt an exact adapter when the target model
-is known or adversarial tests show that the fallback is insufficient.
+Keep the conservative estimator as the fallback. Add caller-selected tokenizer
+adapters. Store tokenizer identity with derived counts. Keep a final admission check.
 
-## 3. Make cache and source identity complete
+Adopt an exact adapter for a known model. Also adopt one when difficult tests show a
+fallback failure.
 
-### Why
+## 3. Complete cache and source identity
 
-A cached result is correct only for the ranking configuration, embedding model and
-revision, tokenizer/ranker version, authorization scope, and index snapshot that
-created it. Omitting any of these can return a valid-looking but wrong or unauthorized
-result. Atomic source versions similarly prevent a query from observing a document
-halfway through replacement.
+### Reason
 
-### Why not put every runtime value in every key
+A cache hit is valid for one ranking, embedding, tokenizer, authorization, and index
+configuration. Missing identity data can return stale or unauthorized results. Atomic
+source identity prevents partial document replacement.
 
-Overly broad keys destroy reuse, increase storage, and make cache behavior difficult to
-understand. Versioned source publication also keeps two editions temporarily and needs
-safe cleanup.
+### Limits
 
-### Preferred decision
+Overly broad keys reduce reuse and increase storage. Versioned publication temporarily
+stores two editions. It also needs safe cleanup.
 
-Define one canonical retrieval-configuration digest and one index snapshot identifier.
-Include only values that can change ranking, visibility, or authorization. Treat cache
-misses after a configuration change as the cost of correctness. Use immutable source
-editions and advance an active-edition pointer atomically when concurrent replacement
-becomes a real workload.
+### Decision
 
-## 4. Add bounded hybrid search before claiming large-catalog scale
+Define one retrieval-configuration digest and one index-snapshot identifier. Include
+only values that affect ranking, visibility, or authorization. Treat a configuration
+change as a cache miss.
 
-### Why
+Use immutable source editions when concurrent replacement becomes a measured workload.
+Change the active-edition pointer atomically.
 
-The lexical candidate path is bounded, but a novel vector query loads and
-scores every live record in a namespace. Its time and transient memory therefore grow
-with the catalog. A bounded hybrid pipeline can union lexical and vector candidates,
-then exactly rerank only tens or hundreds of authorized records.
+## 4. Add bounded hybrid search for large catalogs
 
-Approximate nearest-neighbor (ANN) indexes are one way to generate vector candidates in
-sublinear work. They become important when a local catalog grows beyond the latency or
-resident-memory target.
+### Reason
 
-“Bounded FTS” needs a qualification: the number of returned candidates and downstream
-record hydrations can be bounded, while SQLite FTS may inspect a selectivity-
-dependent posting list internally. Bounded lexical reads do not establish constant-time
-FTS update and delete maintenance. Query-plan and source-replacement measurements remain
-part of the evidence gate.
+Novel exact-vector queries score each live record. Time and temporary memory increase
+with catalog size. A bounded pipeline combines authorized lexical and vector candidates
+before exact reranking.
 
-### Why not use ANN everywhere
+SQLite FTS can inspect a selectivity-dependent posting list. Bounded returned candidates
+do not prove constant internal work. Measure query plans, updates, deletes, and source
+replacement.
 
-ANN trades perfect recall for speed, adds build and migration work, consumes index
-memory, and introduces another derived structure to recover after failure. For a small
-catalog, exact scoring may be faster overall and is easier to debug. Choosing an ANN
-library too early can also couple the core to a platform-specific dependency.
+### Limits
+
+ANN search trades recall for speed. It adds build, migration, memory, recovery, and
+platform work. Exact scoring can remain faster for a small catalog.
 
 ### Alternatives
 
-- Keep exact scoring below a measured size threshold.
-- Use FTS or metadata to prefilter, then exact-score the smaller set.
-- Store vectors in contiguous arrays to reduce Python-object overhead.
-- Use a local ANN adapter behind an interface when prefiltering is insufficient.
+- Keep exact scoring below a measured threshold.
+- Apply metadata or FTS filters before exact scoring.
+- Store vectors contiguously to reduce object overhead.
+- Put an ANN implementation behind a local adapter.
 
 ### Adopt when
 
-Use the smallest approach that meets a declared cold-query p95, peak-memory bound, and
-quality target. An ANN backend must report recall and answer-quality deltas against the
-exact scorer, recovery behavior, build time, disk/RAM cost, and platform support.
+Use the smallest option that meets cold-query latency, memory, and quality targets. An
+ANN report must compare recall and answer quality with exact scoring.
 
-### Diversity and duplicate suppression are a separate decision
+The report must include recovery, build time, disk use, memory use, and platform
+support.
 
-Bounded candidates can fill the reading desk with overlapping chunks from one
-source. Content-hash deduplication, adjacent-chunk merging, per-source caps, or maximal
-marginal relevance can increase evidence coverage. They can also remove useful
-corroboration or the surrounding passage that makes a fact understandable.
+### Diversity is a separate decision
 
-Do not add diversity because it is a standard RAG feature. Measure redundant-token
-rate, source concentration, evidence coverage, and answer grounding first. Protected
-and pinned records must never disappear through a diversity heuristic, and deterministic
-ingest-time deduplication should be considered before query-time algorithms.
+Repeated chunks can consume the desk budget. Hash deduplication, adjacent-chunk merging,
+source limits, or diversity ranking can increase evidence coverage. These controls can
+also remove useful support.
 
-## 5. Batch indexing, but preserve immediate visibility
+Measure repeated-token rate, source concentration, evidence coverage, and answer
+grounding. Never remove protected or pinned records through a diversity rule. Consider
+deterministic ingestion deduplication first.
 
-### Why
+## 5. Batch derived indexing and preserve immediate visibility
 
-Embedding each chunk synchronously makes append latency proportional to document size
-and embedding-service round trips. Batching by total tokens amortizes those round trips,
-and asynchronous derived indexing keeps the durable append path short. The event/outbox
-and recent-overlay behavior keeps an event visible before its embedding is ready, while
-pending work survives restart.
+### Reason
 
-### Why not make everything asynchronous
+Synchronous embedding makes append latency depend on document size and service round
+trips. Token-based batches reduce those trips. Asynchronous indexing keeps durable
+append work short.
 
-Asynchrony introduces queue lag, duplicate delivery, retry policy, shutdown behavior,
-and the possibility that a strict query asks for an index watermark that has not been
-reached. Large batches amortize more embedding requests but can delay interactive work.
+The recent-event layer exposes an event before embedding. The durable outbox preserves
+pending work through restart.
 
-### Preferred decision
+### Limits
 
-Keep the event append synchronous and small. Batch only derived work. Expose recorded,
-embedded, and indexed watermarks; reserve interactive capacity; bound retries; and let
-strict callers wait with a deadline. Adopt larger batches when measured embedding or
-ingest cost, rather than SQLite append cost, dominates the workload.
+Asynchronous work introduces lag, duplicates, retries, shutdown rules, and watermark
+waits. Large batches can delay interactive work.
 
-### Work ownership is a prerequisite for multiple workers
+### Decision
 
-The outbox makes pending work durable, but durability is not ownership. Once several
-workers or governors consume it, rows need an atomic claim or lease, lease expiry and
-reclaim, retry classification, exponential jitter, and an operator-visible quarantine
-for poison events. Stable event identifiers make duplicate delivery safe; they do not
-make duplicate embedding and cache invalidation free.
+Keep event append synchronous and small. Batch derived work only. Expose recorded,
+embedded, and indexed watermarks. Reserve interactive capacity. Bound retries.
 
-Do not add a complex dead-letter workflow to a single deterministic hashing worker.
-Add claim semantics before multi-worker daemonization or paid/external embedding, where
-duplicate cost and infinite retries are operationally meaningful. Track oldest pending
-age, attempt count, spill count, maximum continuous saturation, and recovery drain rate;
-ring occupancy alone can hide short but severe overload.
+Allow strict callers to wait with a deadline. Increase batches when embedding cost
+dominates measured append cost.
+
+### Durable work ownership
+
+Claim tokens and expiring leases assign each outbox row to one worker. The indexer
+claims thread heads and preserves thread order. It uses bounded retry and terminal
+quarantine.
+
+One owner does not steal an expired claim from its own worker. A replacement owner can
+reclaim that claim after expiration. Live hangs require bounded backends and supervised
+restart.
+
+Measure pending age, attempts, quarantine count, continuous saturation, and recovery
+drain rate. Ring occupancy alone can hide short overload.
 
 ## 6. Publish source editions atomically
 
-### Why
+### Reason
 
-Deleting an old document and inserting its new chunks one by one allows readers to see
-an empty or partial edition. Building a new immutable edition and switching one active
-pointer makes visibility atomic and keeps provenance clear.
+Row-by-row replacement exposes an empty or partial document. An immutable edition and
+one active pointer make visibility atomic. This design also preserves clear origin.
 
-### Why not use it for every small update
+### Limits
 
-Versioned publication temporarily duplicates data and requires cleanup, retention, and
-tombstone policy. For a single-user library with rare offline ingestion, this may not
-justify the storage and lifecycle complexity.
+Versioned publication temporarily duplicates data. It needs cleanup, retention, and
+tombstone rules. Rare offline ingestion may not justify this lifecycle.
 
 ### Adopt when
 
-Use atomic editions when documents are refreshed while agents are querying them, when
-rollback matters, or when team provenance requires an exact published version.
+Use atomic editions when replacement overlaps queries. Also use them when rollback or
+exact team origin matters.
 
-## 7. Consolidate into a workstation daemon only when processes compete
+## 7. Use a daemon when local processes compete
 
-### Why
+### Reason
 
-One daemon can share SQLite connections, caches, recent state, schedulers, and fixed
-worker pools across many local agents. It prevents every MCP process from reserving its
-own large cache and starting its own polling or indexing threads. It also gives one
-place for admission control, health reporting, quotas, and graceful recovery.
+One daemon can share connections, caches, recent state, schedulers, and fixed workers.
+It also provides one place for admission, health, quotas, and recovery.
 
-### Why not make it the minimum installation
+### Limits
 
-A daemon needs installation, startup supervision, local authentication, IPC versioning,
-upgrade behavior, and failure recovery. It becomes a workstation-level failure
-boundary. A library embedded in one process is simpler, easier to debug, and entirely
-adequate for a solo agent with a small catalog.
+A daemon needs installation, supervision, authentication, IPC versions, upgrades, and
+recovery. It creates a workstation failure boundary. Embedded mode remains suitable for
+one small process.
 
 ### Adopt when
 
-Move to a daemon when multiple agent processes materially duplicate memory or indexing
-work, contention breaks the declared workload SLO, or workstation-wide quotas and
-health are needed. Keep an embedded mode for tests, small tools, and recovery.
+Adopt a daemon when processes duplicate material memory or work. Also adopt it when
+contention breaks a declared SLO. Keep embedded mode for tests, small tools, and
+recovery.
 
-### Resource policy belongs to the daemon contract
+### Resource contract
 
-A long-running service must define which desks and sessions are disposable, their idle
-time and byte limits, per-project quotas, graceful-drain deadlines, and low-disk
-behavior. Reporting limits before enforcing them is a reasonable first step. Under disk
-pressure, the service should preserve committed context and interactive prompt
-construction, reject or throttle bulk ingest, and provide an explicit remediation path.
-Automatic deletion of durable events is not an acceptable quota mechanism.
+Define disposable state, idle time, byte limits, project quotas, drain deadlines, and
+low-disk behavior. Preserve committed context and interactive prompts during disk
+pressure. Reject or limit bulk ingestion.
+
+Provide an explicit recovery action. Do not delete durable events automatically to
+meet a quota.
 
 ## 8. Use fixed workers, ordering partitions, and backpressure
 
-### Why
+### Reason
 
-Thread-per-request or thread-per-session designs turn overload into latency, memory
-growth, and a thundering herd. A fixed pool makes resource use bounded. Partitioning by
-`(project_id, thread_id)` preserves the order that matters while allowing independent
-threads to proceed concurrently. Admission control prevents bulk ingest from starving
-an interactive context refresh.
+A thread for each request turns overload into delay and memory growth. A fixed pool
+bounds resources. Partitioning by project and thread preserves required order.
 
-### Why not add many priority queues
+Admission control prevents bulk work from blocking an interactive refresh.
 
-Scheduling policy can be harder to reason about than the work itself. Too many lanes
-can starve background maintenance, and rejected work requires a clear client contract.
+### Limits
 
-### Preferred decision
+Complex scheduling can starve maintenance. Rejected work needs a clear client contract.
 
-Start with a small fixed pool, one interactive lane and one bulk lane, queue-age and
-occupancy metrics, and durable overflow through the outbox. Add more policy only from
-observed contention. Stale focus results must carry an input generation and be discarded
-if a newer focus has won.
+### Decision
 
-### Observability and overload contract
+Start with a small fixed pool. Use one interactive lane and one bulk lane. Measure queue
+age and occupancy. Keep durable overflow in the outbox.
 
-Low-cardinality counters and histograms are evidence infrastructure, not a cloud
-telemetry mandate. Measure append and prompt latency, retrieval candidate counts, queue
-age and occupancy, outbox retries, index lag, cache behavior, process memory, disk free
-space, and recovery time. Never use raw prompts, session IDs, record IDs, or project
-names as metric labels.
+Tag each focus result with its input generation. Discard a result after a newer focus
+wins.
 
-The system also needs declared overload behavior. Interactive callers may receive a
-bounded stale desk, a deadline error, or a resource-exhausted response; bulk ingest can
-be throttled while its durable work remains in the outbox. Add exported tracing only
-when local metrics cannot explain incidents or a fleet needs correlation. Verify that
-telemetry overhead and label cardinality remain bounded.
+### Metrics and overload behavior
 
-## 9. Treat summaries and state capsules as derived indexes, not truth
+Measure append and prompt latency, candidates, queue age, retries, index lag, cache
+behavior, memory, disk space, and recovery. Do not use private identifiers or prompt
+text as metric labels.
 
-### Why
+An interactive caller can receive a bounded stale desk, deadline error, or resource
+error. The service can limit bulk ingestion while durable work remains in the outbox.
 
-Long agent threads contain decisions, constraints, objectives, unresolved work, and
-superseded facts. Structured state capsules can retrieve these concepts more directly
-than raw similarity search. Versioned summaries can provide useful navigation and
-reduce prompt cost.
+Add exported tracing only for unexplained incidents or fleet correlation. Verify
+bounded telemetry cost and label counts.
 
-### Why not replace originals with summaries
+## 9. Treat summaries and capsules as derived indexes
 
-A summary can omit a qualification, merge incompatible states, or preserve a decision
-that was later reversed. Automatically generated “memory” may sound authoritative even
-when its evidence is weak. This recreates the main failure of irreversible compaction.
+### Reason
 
-### Preferred decision
+Long threads contain objectives, decisions, constraints, open work, and replaced facts.
+Structured capsules can retrieve these concepts directly. Versioned summaries can help
+navigation and reduce prompt use.
 
-Retain original events, store capsules and summaries as versioned derived records, link
-them to evidence and an input watermark, and visibly mark staleness. Evaluate
-continuity, contradiction handling, and provenance—not just token reduction. Promote a
-derived item to protected status only through an explainable policy.
+### Limits
+
+A summary can omit a condition or combine incompatible states. It can preserve a
+reversed decision. Generated memory can appear more authoritative than its evidence.
+
+### Decision
+
+Retain original events. Store summaries as versioned derived records. Link each derived
+record to evidence and an input watermark. Mark stale records visibly.
+
+Evaluate continuity, contradiction handling, and origin. Do not measure token reduction
+alone. Promote derived records through an explainable rule only.
 
 ## 10. Automate protection conservatively
 
-### Why
+### Reason
 
-Users should not have to manually protect every durable instruction, active constraint,
-or unresolved commitment. An explainable classifier or rule set could keep important
-state resident as the recent ring advances.
+Manual protection can miss an active constraint or unresolved commitment. A clear rule
+can keep important state visible as the recent ring advances.
 
-### Why not protect aggressively
+### Limits
 
-Protected context consumes a fixed part of every prompt. Stale or conflicting protected
-items can crowd out current evidence and repeatedly bias the agent. Automatic release
-can be just as dangerous if it removes a still-valid constraint.
+Protected context consumes each prompt. Stale or conflicting items can displace current
+evidence. Automatic release can remove a valid constraint.
 
 ### Adopt when
 
-Begin with explicit protection. Test candidate policies offline and show, for each
-decision, the reason, evidence, age, and release condition. Automatic policy becomes a
-default only if it outperforms explicit protection in continuity evaluations without
-increasing stale-instruction or contradiction failures.
+Start with explicit protection. Test automatic rules offline. Show the reason, evidence,
+age, and release condition for each decision.
 
-## 11. Add branch and scope semantics before concatenating memories
+Use automatic protection by default only after it improves continuity. It must not
+increase stale-instruction or contradiction failures.
 
-### Why
+## 11. Define branch and scope behavior before memory merging
 
-Agent work naturally forks. A child thread needs a precise inheritance point, while
-personal, project, and team scopes need different privacy and ranking rules. Explicit
-snapshots identify inherited state, while scope routing avoids copying an entire current
-prompt or searching every catalog indiscriminately.
+### Reason
 
-### Why not infer merges automatically
+Agent work can fork. A child thread needs an exact inheritance point. Personal, project,
+and team scopes need different privacy and ranking rules.
 
-Two branches may contain mutually exclusive decisions. Concatenating transcripts or
-merging summaries can hide that conflict. General conflict-free replicated data types
-do not solve semantic disagreement between human decisions.
+### Limits
 
-### Preferred decision
+Two branches can contain incompatible decisions. Transcript concatenation or summary
+merging can hide the conflict. Generic replicated-data structures do not resolve human
+semantic disagreement.
 
-Represent a fork as a parent thread plus sequence or context-snapshot identifier. Merge
-explicit decisions, facts, and artifacts with provenance; do not merge raw transcripts
-by default. Add this machinery when an integration actually exposes branch/fork
-operations or scope confusion appears in retrieval evaluations.
+### Decision
 
-## Lifecycle adapters need a common intervention contract
+Represent a fork with a parent thread and sequence or snapshot identifier. Merge explicit
+decisions, facts, and artifacts with origin. Do not merge raw transcripts by default.
 
-### Why
+Add this behavior when a host exposes forks. Also add it when retrieval tests show scope
+confusion.
 
-The governor bounds context only if the integration records the user turn, sends exactly
-the returned bounded messages, and commits assistant and tool results. Streaming aborts,
-tool-call/result pairs, provider retries, concurrent calls, and native provider
-compaction can otherwise create missing or duplicate events.
+## Lifecycle adapters need one intervention contract
 
-### Why not build an adapter for every framework
+### Reason
 
-Framework and provider APIs change quickly. An adapter without a documented pre-request
-and post-response hook may be cooperative rather than enforceable, and maintenance can
-consume the project without improving the core.
+The governor works only when an integration sends its bounded messages. The integration
+must also record user, assistant, and tool events. Retries, streaming aborts, and native
+compaction can create duplicates or gaps.
+
+### Limits
+
+Provider interfaces change frequently. An adapter without request and response hooks
+cannot enforce the lifecycle. Adapter maintenance must not displace core work.
 
 ### Adopt when
 
-Define one conformance contract for idempotent prepare/commit, retry, abort, streaming,
-tool events, and prevention of full-transcript double-send. Implement an adapter when a
-host exposes the required hook and has maintainers and users. Do not claim that an MCP
-tool replaces an undocumented internal compaction mechanism.
+Define one conformance contract for prepare, commit, retry, abort, streaming, and tool
+events. Prevent full-transcript duplicate sending. Add an adapter only for a host with
+the required hooks and maintainers.
+
+Do not claim that an MCP tool replaces undocumented host compaction.
 
 ## 12. Keep Redis optional and disposable
 
-### Why
+### Reason
 
-Local Redis can share hot records and query results across processes, provide time-to-
-live and least-frequently-used eviction, and reduce repeated SQLite hydration. It is a
-useful accelerator when several local agents reuse the same working set.
+Local Redis can share hot records and query results. It provides expiration and
+eviction. It can reduce repeated SQLite loading across local processes.
 
-### Why not require Redis or move it to the cloud
+### Limits
 
-For one process, the RAM cache may provide the useful hits. Redis adds another
-service, serialization, duplicated data, eviction behavior, and timeout tails. A remote
-Redis adds network latency, credentials, transport security, availability, and cost.
-The local Redis cache is non-durable and therefore cannot serve as a message broker or
-source of truth.
+Redis adds a service, serialization, duplicate data, eviction, and timeout delay. Remote
+Redis also adds network, credential, security, availability, and cost concerns. The
+cache cannot serve as a broker or source of truth.
 
 ### Adopt when
 
-Enable Redis when measured cross-process cache reuse or housekeeping benefit exceeds
-its operating and memory cost. Keep SQLite authoritative and verify that Redis loss does
-not disable prompts. A team deployment should use a separate secured client and service;
-it must not extend the disposable local instance across machines.
+Enable Redis when measured reuse exceeds its operating cost. Keep SQLite authoritative.
+Verify that Redis loss does not stop prompt construction.
 
-## 13. Match durability to the value of the context
+Use a separate secured service for a team deployment. Do not extend the disposable
+local cache across machines.
 
-### Why
+## 13. Match durability to context value
 
-SQLite WAL with `synchronous=NORMAL` provides a practical local balance, but it does not
-promise zero loss under every power or storage failure. Important decisions may justify
-stronger sync, encrypted backups, integrity checks, disk-pressure policy, and restore
-drills.
+### Reason
 
-### Why not force maximum durability
+SQLite write-ahead logging with `synchronous=NORMAL` balances local latency and
+durability. It does not prevent loss under every power or storage failure. Important
+decisions can require stronger synchronization and backups.
 
-Stronger fsync policy increases write latency and storage activity. Backups can preserve
-sensitive or deleted content longer than intended and create another key-management
-problem. Some context is reproducible and does not merit the same recovery point
-objective as an approved project decision.
+### Limits
+
+Stronger disk synchronization increases write latency. Backups can retain sensitive or
+deleted content. They also require encryption-key management.
 
 ### Adopt when
 
-Declare the recovery point objective (RPO) and recovery time objective (RTO) for each
-deployment. Offer stronger local durability as a profile, then test crash and restore
-behavior on the target filesystem. Couple backups to retention, deletion, encryption,
-and low-disk policy.
+Declare the RPO and RTO for each deployment. Offer stronger durability as a profile.
+Test crash and restore behavior on the target file system.
 
-## 14. Promote selected knowledge instead of synchronizing whole prompts
+Connect backups to retention, deletion, encryption, and low-disk rules.
 
-### Why
+## 14. Promote selected knowledge instead of complete prompts
 
-Teams benefit from sharing decisions, approved facts, runbooks, evidence, and artifacts.
-A promotion compiler can turn local work into a reviewable knowledge card with
-provenance while leaving private thread detail on the workstation.
+### Reason
 
-### Why not synchronize every event
+Teams can share decisions, approved facts, procedures, evidence, and artifacts. A
+promotion process creates a reviewable knowledge card. Private thread details remain on
+the workstation.
 
-Full-thread synchronization expands privacy scope, storage, legal obligations, network
-cost, and the chance of sharing credentials or incidental tool output. It also makes a
-remote service part of the operational model even when collaboration is not needed.
+### Limits
+
+Complete-thread synchronization increases privacy, storage, legal, and network scope.
+It also increases the risk of sharing credentials or incidental tool output.
 
 ### Adopt when
 
-Start team work only when multiple people need reusable knowledge across workstations.
-Define what is promotable, who approves it, how it is superseded or deleted, and how a
-recipient inspects provenance. The local Library must continue without the team plane.
+Start team work when people need reusable knowledge across workstations. Define eligible
+content, approval, replacement, deletion, and origin inspection. Keep local operation
+independent from the team service.
 
 ## 15. Enforce authorization during candidate retrieval
 
-### Why
+### Reason
 
-Filtering unauthorized results after search is too late: text may already have been
-hydrated, scored, logged, or cached. Shared indexes must constrain candidates by tenant,
-project, principal, scope, source version, and tombstone state before content is loaded.
-Cache identities must include an authorization fingerprint, and revocation must
-invalidate affected entries.
+Filtering after search is too late. Unauthorized text can already enter memory, scores,
+logs, or caches. Shared indexes must filter candidates before content loading.
 
-### Why not add identity to solo local mode
+Include tenant, project, user, scope, source version, and tombstone state in the filter.
+Include an authorization fingerprint in cache identity. Revocation must clear affected
+entries.
 
-Authentication and policy code add configuration and failure modes without improving a
-single-user loopback deployment. Filesystem permissions and local process boundaries may
-be the correct minimum there.
+### Limits
+
+Identity and policy code add configuration and failures to solo mode. File permissions
+and local process boundaries can remain the correct minimum there.
 
 ### Adopt when
 
 Authorization-aware retrieval is mandatory before mixed-trust data enters one service
-or index. It is not an optional optimization for team mode. Test forbidden queries,
-cache reuse, revocation, offline replicas, logs, and derived indexes for zero leakage.
+or index. Test forbidden queries, cache reuse, revocation, replicas, logs, and derived
+indexes. Require no unauthorized disclosure.
 
-## 16. Use a durable broker only across durable failure boundaries
+## 16. Use a durable broker across durable failure boundaries
 
-### Why
+### Reason
 
-When several nodes must exchange promoted knowledge, a durable stream provides replay,
-acknowledgement, consumer ownership, lag visibility, and recovery after disconnection.
-Stable event identifiers and inbox/outbox records make duplicate delivery safe.
+A durable stream supports replay, acknowledgement, ownership, lag measures, and
+recovery between independent nodes. Stable identifiers and inbox or outbox records make
+duplicates safe.
 
-### Why not use a broker inside one process
+### Limits
 
-The bounded work ring plus transactional SQLite outbox provides fast local
-wake-up and crash recovery. Adding Redis Streams, NATS JetStream, or another broker to a
-single workstation creates deployment and failure work without adding a new durability
-boundary. Raw Redis Pub/Sub is lighter, but it is only a lossy hint and cannot replace
-the outbox.
+One process already has a bounded work ring and SQLite outbox. A broker adds deployment
+and failure work without adding a durability boundary. Redis Pub/Sub is a lossy signal
+and cannot replace the outbox.
 
 ### Adopt when
 
-Add a broker when more than one independently failing node needs offline replay and
-observable delivery. Choose from failure tests, maintenance burden, security, client
-support, and expected throughput—not feature count. Acknowledge only after durable apply
-and retain local inbox/outbox recovery.
+Add a broker when independent nodes need offline replay and observable delivery. Choose
+it through failure tests, maintenance, security, client support, and throughput.
 
-## 17. Keep cloud coordination out of the local prompt critical path
+Acknowledge an event after durable application. Retain local inbox and outbox recovery.
 
-### Why
+## 17. Keep cloud coordination outside local prompt construction
 
-A shared service can centralize device identity, project policy, promoted knowledge,
-audit, and fleet visibility for a distributed team. Managed infrastructure may reduce
-the operational burden when no team-owned LAN host can serve all members.
+### Reason
 
-### Why not make the cloud the Library
+A shared service can coordinate device identity, policy, promoted knowledge, audit, and
+fleet visibility. Managed operation can help a remote team without a common local host.
 
-Centralizing raw context increases privacy and compliance scope. Network latency and
-outages would directly affect agent continuity, and managed storage, vector search, and
-egress introduce ongoing cost. A cloud-central design also weakens the offline premise
-that motivated the Library.
+### Limits
 
-### Preferred decision
+Central raw context increases privacy and compliance scope. Network outages can affect
+continuity. Managed storage, search, and data transfer add continuing cost.
 
-Keep prompt assembly, recent state, private events, and an index sufficient for offline
-prompt construction on the workstation. Synchronize approved knowledge asynchronously.
-Apply deadlines and circuit breakers to optional team retrieval. Adopt a cloud control
-plane only when a real remote team needs shared policy and discovery, and size cost by
-promoted data rather than all prompt traffic.
+### Decision
 
-## Make paging decisions visible to people
+Keep private events, recent state, prompt assembly, and an offline-capable index on the
+workstation. Synchronize approved knowledge asynchronously. Apply deadlines and circuit
+breakers to optional team retrieval.
 
-### Why
+Adopt a cloud control plane for a demonstrated remote-team need. Size cost by promoted
+data instead of all prompt traffic.
 
-Users and agent developers need to know which context was protected, retrieved, omitted,
-truncated, stale, or still waiting for indexing. Without that explanation, a correct
-bounded prompt can feel like arbitrary forgetting, and a stale protected item can be
-difficult to diagnose.
+## Make paging decisions visible
 
-### Why not put every detail in every response
+### Reason
 
-Verbose explanations consume attention and prompt space. Provenance can expose sensitive
-project names or document paths, and a polished explanation can imply more certainty
-than the retrieval policy has.
+Users need to know which context was protected, retrieved, omitted, truncated, stale,
+or pending. This information helps diagnose apparent forgetting and stale protection.
 
-### Preferred decision
+### Limits
 
-Provide a stable machine-readable explanation record and a concise default summary with
-optional drill-down. Use both the Library metaphor and precise technical terms. Redact
-sensitive provenance at trust boundaries. Automatic protection, promotion review, and
-non-developer team use require this interface. A CLI/status inspector satisfies the
-minimum developer-facing requirement.
+Detailed explanations consume attention and prompt space. Origin data can expose
+sensitive project names or paths. A polished explanation can imply unsupported
+certainty.
+
+### Decision
+
+Provide a stable machine-readable explanation and a concise summary. Offer optional
+detail. Use the Library metaphor with precise technical terms. Remove sensitive origin
+data at trust boundaries.
+
+A command-line status inspector meets the minimum developer requirement. Automatic
+protection, promotion, and non-developer use need this interface.
 
 ## Dependency order
 
-Some subsystems depend on earlier contracts:
+Some components depend on earlier contracts:
 
 ```mermaid
 flowchart LR
@@ -585,77 +542,77 @@ flowchart LR
     Q --> O[Optional cloud control plane]
 ```
 
-Authorization design should begin with team-promotion design, even though deployment of
-a broker or cloud plane comes later. A team service must never be launched first and
-secured afterward.
+Begin authorization design with team-promotion design. Do not deploy a team service
+before security controls.
 
-The search and concurrency branches are independent. A solo Library with a very large
-catalog may need ANN before a daemon. Many agents over a small catalog may need shared
-workers before ANN. The milestone order is a dependency guide, not a universal rollout
-sequence.
+Search and concurrency work are independent. A large solo catalog can need ANN before
+a daemon. Many agents with a small catalog can need shared workers before ANN.
 
-## Impossible combinations that require an explicit policy
+The order is a dependency guide. It is not a universal deployment sequence.
 
-Some goals cannot be satisfied simultaneously. Each deployment must declare the
-selected policy.
+## Policy conflicts
+
+Some goals cannot coexist. Each deployment must select and document a policy.
 
 ### Immediate revocation and indefinite offline access
 
-An offline node cannot learn that permission was revoked. A team deployment must choose
-between short-lived signed authorization leases that eventually fail closed, or a
-documented maximum revocation lag and bounded leakage risk. “Zero cross-project
-leakage” applies to current-policy, connected authorization tests unless the node is
-designed to discard cached team data when its lease expires.
+An offline node cannot receive a revocation. Use short authorization leases that fail
+closed. Alternatively, define a maximum revocation delay and bounded exposure risk.
+
+No-disclosure claims apply to connected current-policy tests. An offline node needs
+expired-lease removal for the same claim.
 
 ### One monotonic thread sequence and multiple offline writers
 
-Two disconnected devices cannot allocate one collision-free monotonic thread sequence
-without prior ownership. The first team design should use a single writer lease per
-thread. A later multi-writer design needs device-local sequences, causal metadata, and
-explicit conflict ordering; a global sequence cannot simply be assumed.
+Disconnected devices cannot allocate one collision-free sequence without prior
+ownership. Use one writer lease for each thread initially.
+
+A multi-writer design needs device sequences, causal data, and explicit conflict order.
+Do not assume one global sequence.
 
 ### Unlimited protected context and a bounded prompt
 
-Protected context cannot grow without limit while every protected item remains visible
-in every bounded request. The policy must impose a token/priority cap, page protected
-items, derive a reviewable summary, or return a visible policy error. Silent omission is
-not acceptable because it makes “protected” misleading.
+Every protected item cannot remain in every bounded prompt without a limit. Set a token
+or priority cap. Alternatively, page items, create a reviewable summary, or return a
+visible policy error.
+
+Do not omit protected context silently.
 
 ### Strict freshness and an unrelated global backlog
 
-A strict-freshness wait can be starved if workers repeatedly take older work from other
-threads. Until claims, partitions, and priority exist, strict freshness is bounded by a
-deadline rather than an unconditional guarantee. Status must expose the requested
-thread watermark and the backlog that prevented it.
+Unpartitioned old work can block a strict freshness wait. Use a deadline until claims,
+partitions, and priority prevent starvation. Status must show the thread watermark and
+blocking backlog.
 
-## Modes retained by default
+## Default modes
 
-Retain these modes while they meet their declared workloads and service targets:
+Retain these modes while they meet declared workloads and SLOs:
 
-- Python plus SQLite with no external service for a solo local Library;
-- exact vector scoring for small catalogs and as a quality reference;
-- explicit context protection before automatic policy is trustworthy;
-- an embedded governor for tests and small tools even if a daemon is added;
-- optional Redis rather than a required dependency;
-- original events as truth, with summaries and indexes treated as rebuildable;
-- local prompt construction even when team or cloud services exist.
+- Python and SQLite without an external service for one local Library.
+- exact vector scoring for small catalogs and quality comparison.
+- explicit protection before automatic policy.
+- an embedded governor for tests and small tools.
+- optional Redis instead of a required dependency.
+- original events as authoritative data.
+- local prompt construction when team or cloud services exist.
 
-A proposed subsystem or policy must solve a demonstrated problem while preserving the
-applicable properties above. Additional architectural complexity is not sufficient
-evidence.
+A proposed component must solve a demonstrated problem. It must preserve applicable
+default properties. Additional complexity alone is not evidence.
 
-## Compatibility and migration are part of every decision
+## Compatibility and migration
 
-The Library has several independently versioned surfaces: SQLite schema, thread-event
-schema, embedding model, tokenizer counts, vector index, cache keys, daemon IPC, and
-planned knowledge-card and sync envelopes. A change to one must state:
+The Library versions several surfaces independently. These surfaces include SQLite,
+events, embeddings, token counts, vector indexes, cache keys, daemon IPC, knowledge
+cards, and synchronization messages.
 
-- whether old and new versions can coexist;
-- how data is rebuilt, migrated, or invalidated;
-- how an interrupted migration resumes;
-- what can be rolled back;
-- when old versions and caches can be removed;
-- which mixed-version combinations are tested.
+Each change must state:
 
-Derived data may be rebuilt, but the authoritative event history and provenance must
-remain recoverable throughout the transition.
+- whether versions can coexist.
+- how data is rebuilt, migrated, or cleared.
+- how an interrupted migration resumes.
+- which parts can roll back.
+- when old versions and caches can be removed.
+- which mixed-version combinations have tests.
+
+Derived data can be rebuilt. Authoritative event history and origin must remain
+recoverable through each transition.

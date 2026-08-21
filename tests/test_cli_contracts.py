@@ -13,6 +13,7 @@ from context_cache.cli import main
 from context_cache.cli_commands import COMMAND_HANDLERS, execute_command
 from context_cache.cli_config import create_cache
 from context_cache.cli_parser import build_parser
+from context_cache.server import ServerDrainTimeout
 
 
 class CLIParserTests(unittest.TestCase):
@@ -28,10 +29,10 @@ class CLIParserTests(unittest.TestCase):
             (["ingest", "-"], "shelve-document"),
             (["consult", "subject"], "consult"),
             (["query", "subject"], "consult"),
-            (["desk", "subject"], "desk"),
-            (["context", "subject"], "desk"),
-            (["watch-desk", "subject"], "watch-desk"),
-            (["watch", "subject"], "watch-desk"),
+            (["desk", "subject", "--session", "test-thread"], "desk"),
+            (["context", "subject", "--session", "test-thread"], "desk"),
+            (["watch-desk", "subject", "--session", "test-thread"], "watch-desk"),
+            (["watch", "subject", "--session", "test-thread"], "watch-desk"),
             (["discard", "record"], "discard"),
             (["delete", "record"], "discard"),
             (["serve"], "serve"),
@@ -80,8 +81,66 @@ class CLIConfigurationTests(unittest.TestCase):
             finally:
                 cache.close()
 
+    def test_daemon_claims_database_before_sqlite_initialization(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "library.sqlite"
+            args = build_parser().parse_args(
+                ["--db", str(database), "--no-redis", "serve"]
+            )
+            cache = create_cache(args)
+            try:
+                self.assertIsNotNone(cache.database_runtime_lock)
+                with patch("context_cache.engine.SQLiteStore") as sqlite_store:
+                    with self.assertRaisesRegex(
+                        RuntimeError,
+                        "another Library runtime owns",
+                    ):
+                        create_cache(args)
+                sqlite_store.assert_not_called()
+            finally:
+                cache.close()
+
 
 class CLICommandTests(unittest.TestCase):
+    def test_serve_supplies_the_token_file_credential(self) -> None:
+        class OpenCache:
+            closed = False
+
+            def close(self) -> None:
+                self.closed = True
+
+        cache = OpenCache()
+        args = build_parser().parse_args(
+            [
+                "--db",
+                "data/project.sqlite",
+                "serve",
+                "--auth-token-file",
+                "data/project.daemon-token",
+            ]
+        )
+        output = io.StringIO()
+        with (
+            patch("context_cache.cli_commands.create_cache", return_value=cache),
+            patch(
+                "context_cache.cli_commands.load_or_create_daemon_token",
+                return_value="x" * 32,
+            ) as load_token,
+            patch("context_cache.cli_commands.run_server") as serve,
+            redirect_stdout(output),
+        ):
+            self.assertEqual(execute_command(args), 0)
+
+        load_token.assert_called_once_with(Path("data/project.daemon-token"))
+        serve.assert_called_once_with(
+            cache,
+            "127.0.0.1",
+            8765,
+            auth_token="x" * 32,
+        )
+        self.assertIn("Daemon token file:", output.getvalue())
+        self.assertTrue(cache.closed)
+
     def test_command_aliases_emit_canonical_json_payloads(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             database = Path(directory) / "library.sqlite"
@@ -137,6 +196,31 @@ class CLICommandTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(RuntimeError, "handler failed"):
                 execute_command(args)
+        self.assertTrue(cache.closed)
+
+    def test_daemon_drain_timeout_starts_cache_cleanup(self) -> None:
+        class OpenCache:
+            closed = False
+
+            def close(self) -> None:
+                self.closed = True
+
+        cache = OpenCache()
+        args = build_parser().parse_args(
+            ["serve", "--auth-token-file", "test-daemon-token"]
+        )
+        with (
+            patch("context_cache.cli_commands.create_cache", return_value=cache),
+            patch(
+                "context_cache.cli_commands.load_or_create_daemon_token",
+                return_value="x" * 32,
+            ),
+            patch(
+                "context_cache.cli_commands.run_server",
+                side_effect=ServerDrainTimeout("active requests remain"),
+            ),
+        ):
+            self.assertEqual(execute_command(args), 1)
         self.assertTrue(cache.closed)
 
     def test_quickstart_does_not_open_the_configured_cache(self) -> None:

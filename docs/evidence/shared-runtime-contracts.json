@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "decision": "docs/adr/0001-thread-scope-and-shared-runtime.md",
+  "contracts": [
+    {
+      "invariant": 1,
+      "boundary": ["MCP schema", "MCP service", "HTTP application"],
+      "tests": [
+        "tests.test_identity_and_scope.IdentityContractTests.test_stateful_mcp_tools_require_session_id",
+        "tests.test_identity_and_scope.IdentityContractTests.test_stateful_services_reject_missing_session_id",
+        "tests.test_identity_and_scope.IdentityContractTests.test_thread_key_rejects_ambiguous_identifiers"
+      ]
+    },
+    {
+      "invariant": 2,
+      "boundary": ["SQLite thread events", "Python governor"],
+      "tests": [
+        "tests.test_identity_and_scope.ScopeRoutingTests.test_same_event_id_is_valid_in_distinct_threads",
+        "tests.test_queues_and_registry.QueueAndBudgetTests.test_recent_ring_is_ordered_bounded_and_idempotent"
+      ]
+    },
+    {
+      "invariant": 3,
+      "boundary": ["SQLite event and outbox transaction", "event-derived record identity"],
+      "tests": [
+        "tests.test_governor.ContextGovernorTests.test_prepare_is_durable_before_index_and_prompt_is_bounded",
+        "tests.test_adversarial_contracts.RecoveryAndOwnershipContractTests.test_event_record_identity_is_reserved_by_the_durable_event",
+        "tests.test_adversarial_contracts.RecoveryAndOwnershipContractTests.test_thread_event_append_rejects_a_preexisting_record_id"
+      ]
+    },
+    {
+      "invariant": 4,
+      "boundary": ["Python record API", "SQLite upsert"],
+      "tests": [
+        "tests.test_identity_and_scope.ScopeRoutingTests.test_upsert_cannot_change_a_record_visibility_boundary",
+        "tests.test_adversarial_contracts.RecordConcurrencyContractTests.test_conflicting_visibility_writes_have_one_atomic_winner"
+      ]
+    },
+    {
+      "invariant": 5,
+      "boundary": ["lookup", "search", "pinning", "desk", "MCP", "HTTP"],
+      "tests": [
+        "tests.test_identity_and_scope.ScopeRoutingTests.test_thread_records_are_isolated_and_project_records_are_shared",
+        "tests.test_identity_and_scope.ScopeRoutingTests.test_team_scope_requires_an_authorized_team_route",
+        "tests.test_identity_and_scope.ScopeRoutingTests.test_mcp_scope_routes_apply_to_search_and_pinned_desks",
+        "tests.test_http_contracts.HTTPApplicationRoutingTests.test_http_scope_routes_apply_to_search_and_pinned_desks"
+      ]
+    },
+    {
+      "invariant": 6,
+      "boundary": ["Python promotion API", "SQLite records"],
+      "tests": [
+        "tests.test_identity_and_scope.ScopeRoutingTests.test_promotion_copies_context_and_retains_private_source"
+      ]
+    },
+    {
+      "invariant": 7,
+      "boundary": ["LibraryRuntime ownership", "governor handles"],
+      "tests": [
+        "tests.test_shared_runtime.SharedRuntimeTests.test_one_hundred_governors_share_fixed_workers_and_bounded_state",
+        "tests.test_shared_runtime.SharedRuntimeTests.test_one_scheduler_coordinates_one_hundred_watches"
+      ]
+    },
+    {
+      "invariant": 8,
+      "boundary": ["thread-state registry", "recent ring", "desk scheduler", "work queue"],
+      "tests": [
+        "tests.test_thread_registry.ThreadStateRegistryTests.test_ten_thousand_thread_churn_remains_within_capacity",
+        "tests.test_adversarial_contracts.RingAndSchedulerContractTests.test_schedule_stop_churn_retains_only_bounded_live_state",
+        "tests.test_adversarial_contracts.RingAndSchedulerContractTests.test_blocked_worker_does_not_create_an_unbounded_submission_queue",
+        "tests.test_adversarial_contracts.RingAndSchedulerContractTests.test_recent_ring_projects_oversized_events_within_both_limits"
+      ]
+    },
+    {
+      "invariant": 9,
+      "boundary": ["ThreadKey operation lock"],
+      "tests": [
+        "tests.test_thread_registry.ThreadStateRegistryTests.test_operation_lock_serializes_handles_for_the_same_thread",
+        "tests.test_identity_and_scope.ScopeRoutingTests.test_virtual_session_filters_source_labels_and_serializes_writes"
+      ]
+    },
+    {
+      "invariant": 10,
+      "boundary": ["SQLite outbox claims", "process-owner lease fencing"],
+      "tests": [
+        "tests.test_shared_runtime.SharedRuntimeTests.test_outbox_claims_are_exclusive_ordered_and_recoverable",
+        "tests.test_shared_runtime.SharedRuntimeTests.test_same_owner_does_not_replace_its_active_token_after_lease_expiry",
+        "tests.test_adversarial_contracts.RecoveryAndOwnershipContractTests.test_replacement_owner_reclaims_an_expired_lease_without_release",
+        "tests.test_shared_runtime.SharedRuntimeTests.test_fatal_indexer_exit_releases_only_its_token_and_reports_degradation"
+      ]
+    },
+    {
+      "invariant": 11,
+      "boundary": ["terminal outbox quarantine", "governor retry"],
+      "tests": [
+        "tests.test_adversarial_contracts.RecoveryAndOwnershipContractTests.test_terminal_event_allows_later_progress_and_explicit_retry",
+        "tests.test_shared_runtime.SharedRuntimeTests.test_terminal_failure_is_visible_and_does_not_block_later_work"
+      ]
+    },
+    {
+      "invariant": 12,
+      "boundary": ["database owner lock", "loopback daemon", "thin MCP bridge"],
+      "tests": [
+        "tests.test_adversarial_contracts.RecoveryAndOwnershipContractTests.test_second_process_cannot_open_an_owned_database",
+        "tests.test_daemon_contract.DaemonBoundaryTests.test_remote_stdio_mode_opens_no_local_library_or_embedder",
+        "tests.test_daemon_contract.DaemonBoundaryTests.test_two_thin_bridges_share_the_daemon_runtime",
+        "tests.test_http_contracts.HTTPTransportContractTests.test_transport_rejects_unauthorized_browser_and_non_json_requests"
+      ]
+    },
+    {
+      "invariant": 13,
+      "boundary": ["SQLite schema migration", "FTS", "foreign keys"],
+      "tests": [
+        "tests.test_schema_migrations.SchemaMigrationTests.test_v2_records_and_event_identity_migrate_safely",
+        "tests.test_schema_migrations.SchemaMigrationTests.test_migrated_pending_event_reindexes_its_legacy_projection",
+        "tests.test_schema_migrations.SchemaMigrationTests.test_v2_orphaned_outbox_row_is_rejected_by_schema_verification",
+        "tests.test_schema_migrations.SchemaMigrationTests.test_interrupted_stage_resumes_from_its_durable_version",
+        "tests.test_schema_migrations.SchemaMigrationTests.test_each_outbox_migration_stage_resumes_from_its_durable_version",
+        "tests.test_schema_migrations.SchemaMigrationTests.test_fts_population_recovers_after_interrupted_initialization",
+        "tests.test_schema_migrations.SchemaMigrationTests.test_migration_is_idempotent_and_future_schema_is_rejected"
+      ]
+    },
+    {
+      "invariant": 14,
+      "boundary": ["source-version fixture reader", "pre-migration backup"],
+      "tests": [
+        "tests.test_schema_migrations.SchemaMigrationTests.test_v2_records_and_event_identity_migrate_safely"
+      ]
+    }
+  ]
+}

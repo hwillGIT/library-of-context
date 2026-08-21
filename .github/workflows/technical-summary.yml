@@ -1,0 +1,36 @@
+name: Pull-request technical summary
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: technical-summary-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  technical-summary:
+    name: Technical summary structure
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check out trusted base policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Check technical summary
+        run: >-
+          python -B
+          .agents/skills/write-timeless-technical-prose/scripts/check_github_summary.py
+          --event "$GITHUB_EVENT_PATH"
+          --policy
+          .agents/skills/write-timeless-technical-prose/references/github-technical-communication.yaml

@@ -98,7 +98,12 @@ nav:
       - Team architecture: TEAM_ARCHITECTURE.md
       - Roadmap and research: roadmap.md
   - Reference:
+      - Glossary: GLOSSARY.md
+      - Technical language rules: TECHNICAL_LANGUAGE.md
       - Python API: API_REFERENCE.md
+      - Contributor QA workflow: DEVELOPMENT_WORKFLOW.md
+      - Shared-runtime contract evidence: evidence/README.md
+      - ADR 0001 — thread scope and shared runtime: adr/0001-thread-scope-and-shared-runtime.md
       - Decision brief template: DECISION_BRIEF_TEMPLATE.md
       - Contributing: contributing.md
       - Security: security.md

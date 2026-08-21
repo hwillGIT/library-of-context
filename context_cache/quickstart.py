@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .embeddings import HashingEmbedder
 from .engine import ContextCache
+from .runtime import RuntimeSettings
 
 
 def run_quickstart() -> int:
@@ -12,13 +13,18 @@ def run_quickstart() -> int:
 
     with tempfile.TemporaryDirectory(prefix="library-context-quickstart-") as directory:
         database = Path(directory) / "quickstart.sqlite"
-        with ContextCache(database, redis_url="", embedder=HashingEmbedder()) as cache:
+        runtime_settings = RuntimeSettings(outbox_poll_seconds=0.01)
+        with ContextCache(
+            database,
+            redis_url="",
+            embedder=HashingEmbedder(),
+            runtime_settings=runtime_settings,
+        ) as cache:
             with cache.open_context_governor(
                 "quickstart-agent",
                 token_budget=700,
                 recent_token_budget=180,
                 protected_token_budget=100,
-                worker_poll_seconds=0.01,
             ) as context:
                 context.protect(
                     "A production rollout must begin with a canary wave.",

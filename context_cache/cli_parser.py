@@ -136,7 +136,7 @@ def _add_desk_commands(commands: _SubparserFactory) -> None:
         help_text="replace the reading desk with a token-bounded relevant working set",
     )
     desk.add_argument("focus")
-    desk.add_argument("--session", default="cli")
+    desk.add_argument("--session", required=True)
     desk.add_argument("--budget", type=int, default=4000)
     desk.add_argument("--top-k", type=int, default=12)
     desk.add_argument("--filters", type=json_object)
@@ -151,7 +151,7 @@ def _add_desk_commands(commands: _SubparserFactory) -> None:
         help_text="periodically replace the reading desk as relevance changes",
     )
     watch.add_argument("focus")
-    watch.add_argument("--session", default="cli")
+    watch.add_argument("--session", required=True)
     watch.add_argument("--budget", type=int, default=4000)
     watch.add_argument("--top-k", type=int, default=12)
     watch.add_argument("--interval", type=float, default=30.0)
@@ -173,10 +173,15 @@ def _add_maintenance_commands(commands: _SubparserFactory) -> None:
         commands,
         "serve",
         handler="serve",
-        help_text="run the local HTTP service",
+        help_text="run the loopback daemon that owns the Library runtime",
     )
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8765)
+    serve.add_argument(
+        "--auth-token-file",
+        default=os.environ.get("LIBRARY_OF_CONTEXT_DAEMON_TOKEN_FILE"),
+        help="owner-readable daemon bearer-token file; defaults beside the database",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:

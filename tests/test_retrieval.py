@@ -180,6 +180,9 @@ class RetrievalCacheTests(unittest.TestCase):
                 "importance_weight",
                 "recency_weight",
                 "recency_half_life_days",
+                "scopes",
+                "session_id",
+                "team_ids",
             ],
         )
         self.assertEqual(parameters["top_k"].default, 8)
@@ -210,9 +213,15 @@ class RetrievalCacheTests(unittest.TestCase):
                     first = cache.retrieve("alpha", top_k=3)
                     second = cache.retrieve("alpha", top_k=3)
 
-                self.assertIs(first, second)
+                self.assertEqual(first, second)
+                self.assertIsNot(first, second)
                 self.assertEqual(embedder.calls, 1)
-                list_records.assert_called_once_with("default")
+                list_records.assert_called_once()
+                self.assertEqual(list_records.call_args.args, ("default",))
+                selection = list_records.call_args.kwargs["selection"]
+                self.assertEqual(
+                    [scope.value for scope in selection.scopes], ["project"]
+                )
                 self.assertEqual(cache.query_ram.stats()["hits"], 1)
                 self.assertGreaterEqual(cache.ram.stats()["items"], 1)
                 stored = cache.store.get("default", "alpha")
@@ -258,7 +267,8 @@ class RetrievalCacheTests(unittest.TestCase):
                     recency_weight=0.0,
                     recency_half_life_days=30.0,
                 )
-                self.assertIs(repeated, lexical_ranked)
+                self.assertEqual(repeated, lexical_ranked)
+                self.assertIsNot(repeated, lexical_ranked)
                 self.assertEqual(embedder.calls, 2)
 
     def test_embedder_configuration_is_part_of_the_cache_identity(self) -> None:
@@ -301,7 +311,8 @@ class RetrievalCacheTests(unittest.TestCase):
 
                 cache.query_ram.clear()
                 second = cache.retrieve("shared cache", top_k=2)
-                self.assertIs(second, first)
+                self.assertEqual(second, first)
+                self.assertIsNot(second, first)
                 self.assertEqual(embedder.calls, 1)
                 self.assertEqual(cache.query_ram.stats()["items"], 1)
         self.assertTrue(hot_cache.closed)
@@ -319,7 +330,8 @@ class RetrievalCacheTests(unittest.TestCase):
                 first = cache.retrieve("missing", minimum_score=2.0)
                 second = cache.retrieve("missing", minimum_score=2.0)
 
-                self.assertIs(first, second)
+                self.assertEqual(first, second)
+                self.assertIsNot(first, second)
                 self.assertEqual(first, [])
                 self.assertEqual(embedder.calls, 1)
                 self.assertEqual(cache.query_ram.stats()["items"], 1)

@@ -3,25 +3,37 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from . import mcp_views
+from .client import LibraryDaemonClient
 from .governor import LibraryContextGovernor
 from .library import LibraryOfContext, ReadingDesk
+from .limits import MAX_RESULT_BOOKS, bounded_integer, bounded_string_tuple
 from .resource_registry import GovernorRegistry, VirtualSessionRegistry
+from .scopes import ThreadKey
 from .session import VirtualContextSession
 
 
 class LibraryMCPTools:
     """Execute Library MCP tools independently of the JSON-RPC transport."""
 
-    def __init__(self, library: LibraryOfContext) -> None:
+    def __init__(
+        self,
+        library: LibraryOfContext,
+        *,
+        close_library: bool = True,
+    ) -> None:
         self.library = library
+        self._close_library = close_library
         self.desk: ReadingDesk = library.open_reading_desk()
+        runtime_settings = library.runtime.settings
         self.session_registry = VirtualSessionRegistry(
             library,
-            default_session_id="codex",
+            max_entries=runtime_settings.max_active_threads,
+            idle_ttl_seconds=runtime_settings.thread_idle_ttl_seconds,
         )
         self.governor_registry = GovernorRegistry(
             library,
-            default_session_id="codex",
+            max_entries=runtime_settings.max_active_threads,
+            idle_ttl_seconds=runtime_settings.thread_idle_ttl_seconds,
         )
         self.sessions = self.session_registry.sessions
         self.governors = self.governor_registry.governors
@@ -53,6 +65,9 @@ class LibraryMCPTools:
             source=args.get("source", "mcp"),
             importance=float(args.get("importance", 0.5)),
             shelf_life_seconds=args.get("shelf_life_seconds"),
+            scope=args.get("scope", "project"),
+            owner_session_id=args.get("owner_session_id"),
+            team_id=args.get("team_id"),
         )
         return {"shelved": True, "book": mcp_views.book_view(record)}
 
@@ -66,6 +81,9 @@ class LibraryMCPTools:
             chapter_tokens=int(args.get("chapter_tokens", 450)),
             overlap_tokens=int(args.get("overlap_tokens", 60)),
             replace_edition=bool(args.get("replace_edition", False)),
+            scope=args.get("scope", "project"),
+            owner_session_id=args.get("owner_session_id"),
+            team_id=args.get("team_id"),
         )
         return {
             "shelved": len(records),
@@ -76,26 +94,44 @@ class LibraryMCPTools:
     def _consult(self, args: dict[str, Any]) -> dict[str, Any]:
         hits = self.library.consult(
             args["subject"],
-            max_books=int(args.get("max_books", 8)),
+            max_books=bounded_integer(
+                args.get("max_books", 8),
+                name="max_books",
+                minimum=1,
+                maximum=MAX_RESULT_BOOKS,
+            ),
             collection=args.get("collection"),
             catalog_filters=args.get("catalog_filters"),
             minimum_relevance=float(args.get("minimum_relevance", 0.0)),
+            team_ids=bounded_string_tuple(
+                args.get("team_ids"),
+                name="team_ids",
+                maximum_items=MAX_RESULT_BOOKS,
+            ),
         )
-        return {
-            "subject": args["subject"],
-            "hits": [mcp_views.hit_view(hit) for hit in hits],
-        }
+        return mcp_views.search_view(args["subject"], hits)
 
     @staticmethod
     def _desk_args(args: dict[str, Any]) -> dict[str, Any]:
         return {
-            "session_id": args.get("session_id", "codex"),
+            "session_id": args["session_id"],
             "focus": args["subject"],
             "token_budget": int(args.get("token_budget", 4000)),
             "top_k": int(args.get("max_books", 12)),
             "namespace": args.get("collection"),
             "filters": args.get("catalog_filters"),
-            "pinned_record_ids": args.get("keep_open"),
+            "pinned_record_ids": list(
+                bounded_string_tuple(
+                    args.get("keep_open"),
+                    name="keep_open",
+                    maximum_items=MAX_RESULT_BOOKS,
+                )
+            ),
+            "team_ids": bounded_string_tuple(
+                args.get("team_ids"),
+                name="team_ids",
+                maximum_items=MAX_RESULT_BOOKS,
+            ),
         }
 
     def _desk_refresh(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -103,7 +139,7 @@ class LibraryMCPTools:
 
     def _desk_get(self, args: dict[str, Any]) -> dict[str, Any]:
         working = self.desk.get(
-            args.get("session_id", "codex"),
+            args["session_id"],
             namespace=args.get("collection"),
         )
         return {
@@ -124,7 +160,7 @@ class LibraryMCPTools:
 
     def _desk_stop(self, args: dict[str, Any]) -> dict[str, Any]:
         stopped = self.desk.stop_periodic(
-            args.get("session_id", "codex"),
+            args["session_id"],
             namespace=args.get("collection"),
         )
         return {"stopped": stopped}
@@ -213,8 +249,16 @@ class LibraryMCPTools:
         return {"flushed": flushed, "status": governor.status()}
 
     def _stats(self, args: dict[str, Any]) -> dict[str, Any]:
-        stats = self.library.stats(namespace=args.get("collection"))
-        stats["periodic_desks"] = self.desk.status()
+        collection = args.get("collection") or self.library.namespace
+        if not isinstance(collection, str):
+            raise TypeError("collection must be a string")
+        ThreadKey(collection, "statistics")
+        stats = self.library.stats(namespace=collection)
+        stats["periodic_desks"] = self.desk.status(namespace=collection)
+        stats["governor_registry"] = self.governor_registry.stats(collection=collection)
+        stats["virtual_session_registry"] = self.session_registry.stats(
+            collection=collection
+        )
         return stats
 
     def call(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
@@ -230,4 +274,46 @@ class LibraryMCPTools:
         self.governor_registry.close()
         self.session_registry.close()
         self.desk.close()
-        self.library.close()
+        if self._close_library:
+            self.library.close()
+
+
+class DaemonMCPTools:
+    """Forward MCP tool calls to the runtime owned by a loopback daemon."""
+
+    def __init__(
+        self,
+        client: LibraryDaemonClient,
+        *,
+        default_collection: str | None = None,
+    ) -> None:
+        self.client = client
+        self.default_collection = (
+            None
+            if default_collection is None
+            else ThreadKey(default_collection, "daemon-bridge").collection
+        )
+        self.health = client.health()
+
+    @property
+    def runtime_id(self) -> str:
+        runtime = self.health["runtime"]
+        assert isinstance(runtime, dict)
+        return str(runtime["id"])
+
+    def call(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        routed_arguments = dict(arguments)
+        if self.default_collection is not None:
+            collection = routed_arguments.get("collection")
+            if collection is None or (
+                isinstance(collection, str) and not collection.strip()
+            ):
+                routed_arguments["collection"] = self.default_collection
+            elif not isinstance(collection, str):
+                raise ValueError("collection must be a string")
+            else:
+                ThreadKey(collection, "daemon-bridge")
+        return self.client.call_mcp_tool(name, routed_arguments)
+
+    def close(self) -> None:
+        pass

@@ -6,6 +6,7 @@ import socket
 import threading
 import time
 import urllib.parse
+import uuid
 import zlib
 from collections.abc import Callable
 from typing import Any
@@ -155,20 +156,20 @@ def _load(value: bytes) -> Any:
 
 
 class RedisHotCache:
-    """Disposable shared RAM tier. SQLite is authoritative."""
+    """Disposable per-runtime Redis tier. SQLite is authoritative."""
 
     def __init__(
         self,
         url: str,
         *,
-        prefix: str = "library-of-context:v1",
+        prefix: str = "library-of-context:v2",
         record_ttl: int = 3600,
         query_ttl: int = 60,
         working_set_ttl: int = 900,
         required: bool = False,
     ) -> None:
         self.client = RedisClient(url)
-        self.prefix = prefix.rstrip(":")
+        self.prefix = f"{prefix.rstrip(':')}:runtime:{uuid.uuid4().hex}"
         self.record_ttl = record_ttl
         self.query_ttl = query_ttl
         self.working_set_ttl = working_set_ttl
@@ -300,6 +301,11 @@ class RedisHotCache:
             lambda: self.client.command("GET", self._working_key(namespace, session_id))
         )
         return None if raw is None else WorkingSet.from_dict(_load(raw))
+
+    def delete_working_set(self, namespace: str, session_id: str) -> None:
+        self._safe(
+            lambda: self.client.command("DEL", self._working_key(namespace, session_id))
+        )
 
     def stats(self) -> dict[str, Any]:
         return {

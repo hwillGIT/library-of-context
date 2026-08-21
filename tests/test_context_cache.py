@@ -8,6 +8,8 @@ import threading
 import time
 import unittest
 import urllib.request
+from pathlib import Path
+from unittest import mock
 
 from context_cache import (
     ContextCache,
@@ -76,6 +78,71 @@ class _FakeRedisServer(socketserver.ThreadingTCPServer):
 
 
 class ContextCacheTests(unittest.TestCase):
+    def test_expiry_cleanup_cannot_delete_a_concurrent_live_replacement(self) -> None:
+        expired = ContextRecord(
+            id="expiry-race",
+            namespace="test",
+            text="expired",
+            embedding=[0.0] * self.cache.embedder.dimensions,
+            token_count=1,
+            expires_at=time.time() - 1.0,
+        )
+        live = ContextRecord(
+            id="expiry-race",
+            namespace="test",
+            text="live replacement",
+            embedding=[0.0] * self.cache.embedder.dimensions,
+            token_count=2,
+        )
+        self.cache.store.upsert(expired)
+        decode_entered = threading.Event()
+        release_decode = threading.Event()
+        writer_finished = threading.Event()
+        reader_values: list[ContextRecord | None] = []
+        original_decode = self.cache.store._from_row
+        decode_calls = 0
+        call_lock = threading.Lock()
+
+        def gated_decode(row: object) -> ContextRecord:
+            nonlocal decode_calls
+            with call_lock:
+                decode_calls += 1
+                first = decode_calls == 1
+            if first:
+                decode_entered.set()
+                if not release_decode.wait(2.0):
+                    raise TimeoutError("expired row decode was not released")
+            return original_decode(row)
+
+        def read_expired() -> None:
+            reader_values.append(self.cache.store.get("test", "expiry-race"))
+
+        def write_live() -> None:
+            self.cache.store.upsert(live)
+            writer_finished.set()
+
+        with mock.patch.object(
+            self.cache.store,
+            "_from_row",
+            side_effect=gated_decode,
+        ):
+            reader = threading.Thread(target=read_expired)
+            writer = threading.Thread(target=write_live)
+            reader.start()
+            self.assertTrue(decode_entered.wait(2.0))
+            writer.start()
+            self.assertFalse(writer_finished.wait(0.05))
+            release_decode.set()
+            reader.join(2.0)
+            writer.join(2.0)
+
+        self.assertEqual(reader_values, [None])
+        self.assertTrue(writer_finished.is_set())
+        self.assertEqual(
+            self.cache.store.get("test", "expiry-race").text,
+            "live replacement",
+        )
+
     def setUp(self) -> None:
         self.directory = tempfile.TemporaryDirectory()
         self.db = os.path.join(self.directory.name, "cache.sqlite")
@@ -90,6 +157,28 @@ class ContextCacheTests(unittest.TestCase):
         first, second = embedder.embed(["alpha beta", "alpha beta"])
         self.assertEqual(first, second)
         self.assertAlmostEqual(sum(value * value for value in first), 1.0, places=6)
+
+    def test_in_memory_sqlite_storage_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "filesystem-backed SQLite database"):
+            ContextCache(":memory:", redis_url="")
+
+    def test_database_lock_and_store_share_one_absolute_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            original_directory = os.getcwd()
+            library: ContextCache | None = None
+            try:
+                os.chdir(directory)
+                library = ContextCache("nested/library.sqlite", redis_url="")
+                database_path = Path(library.store.path)
+                self.assertTrue(database_path.is_absolute())
+                self.assertEqual(
+                    library.database_runtime_lock.path,
+                    database_path.with_name(database_path.name + ".daemon.lock"),
+                )
+            finally:
+                if library is not None:
+                    library.close()
+                os.chdir(original_directory)
 
     def test_disk_recovers_after_ram_is_cleared(self) -> None:
         record = self.cache.put("durable decision", record_id="decision-1")
@@ -163,7 +252,9 @@ class ContextCacheTests(unittest.TestCase):
         )
         self.assertLessEqual(working.token_count, working.token_budget)
         self.assertEqual(working.hits[0].record.id, "pin")
-        self.assertIs(swapper.get("test"), working)
+        stored = swapper.get("test")
+        self.assertEqual(stored, working)
+        self.assertIsNot(stored, working)
         swapper.close()
 
     def test_periodic_refresh_starts_updates_and_stops(self) -> None:
@@ -208,7 +299,11 @@ class ContextCacheTests(unittest.TestCase):
         self.assertEqual(library.consult("bounded reading desk")[0].record.id, book.id)
         desk = library.open_reading_desk()
         self.assertIsInstance(desk, ReadingDesk)
-        working = desk.lay_out("virtual context", token_budget=100)
+        working = desk.lay_out(
+            "virtual context",
+            session_id="facade-test",
+            token_budget=100,
+        )
         self.assertIn("book-1", working.swapped_in)
         desk.close()
 
@@ -216,23 +311,33 @@ class ContextCacheTests(unittest.TestCase):
         self.assertIs(PublicLibraryOfContext, LibraryOfContext)
 
     def test_local_http_api(self) -> None:
-        server, swapper = create_server(self.cache, "127.0.0.1", 0)
+        server, swapper = create_server(
+            self.cache,
+            "127.0.0.1",
+            0,
+            auth_token="context-cache-token-0000000000000001",
+        )
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         base = f"http://127.0.0.1:{server.server_address[1]}"
+        authorization = {"Authorization": f"Bearer {server.auth_token}"}
 
         def post(path: str, body: dict[str, object]) -> dict[str, object]:
             request = urllib.request.Request(
                 base + path,
                 data=json.dumps(body).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json", **authorization},
                 method="POST",
             )
             with urllib.request.urlopen(request, timeout=2) as response:
                 return json.loads(response.read())
 
         try:
-            with urllib.request.urlopen(base + "/health", timeout=2) as response:
+            health_request = urllib.request.Request(
+                base + "/health",
+                headers=authorization,
+            )
+            with urllib.request.urlopen(health_request, timeout=2) as response:
                 self.assertTrue(json.loads(response.read())["ok"])
             created = post(
                 "/books",

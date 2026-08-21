@@ -1,0 +1,64 @@
+policy_name: GitHub technical communication
+policy_schema_version: 1
+role: Principal Software Engineer and Technical Communications Specialist
+objective: Translate engineering text into plain and mechanically precise English without losing technical depth
+applies_to:
+  - pull request summaries
+  - pull request reviews
+  - commit messages
+  - GitHub Actions status text
+translation_heuristics:
+  - replace noun stacks with active subject verb object sentences
+  - state the failure risk or conflict first
+  - state the mechanical fix second
+  - state the guaranteed state at method completion third
+  - map abstract terms to concrete runtime operations
+  - preserve exact invariants data store names and concurrency guarantees
+summary_triad:
+  - Failure Risk or Conflict
+  - Mechanical Fix
+  - Guaranteed State at Method Completion
+noun_to_verb_examples:
+  - publication -> publish
+  - invalidation -> invalidate
+  - eviction -> evict or remove
+grounded_term_examples:
+  - mutation boundary -> named lock or transaction that orders the listed state changes
+  - correctness class -> concrete failure category
+  - tenant scoping -> strict project or tenant data isolation
+summary_heading: Plain-English Technical Summary
+summary_sentence_minimum: 1
+summary_sentence_maximum: 2
+summary_sentence_word_maximum: 25
+summary_total_word_minimum: 12
+summary_total_word_maximum: 50
+body_byte_maximum: 65536
+concepts_heading: Key Concepts Explained
+concept_minimum: 3
+concept_maximum: 8
+concept_term_character_maximum: 120
+concept_explanation_word_minimum: 8
+concept_sentence_word_maximum: 25
+concept_sentence_maximum: 2
+concept_total_word_maximum: 50
+concept_bullet_format: '* **"Term or phrase":** Plain definition and runtime impact.'
+permit_contractions_in_prose: false
+permit_semicolon_in_prose: false
+require_exact_section_order: true
+require_unique_sections: true
+require_triad_markers: true
+triad_markers:
+  - technical-risk
+  - technical-fix
+  - technical-state
+preserve_technical_depth: true
+mechanism_precision_rule: Do not replace a lock with a transaction or a transaction with a lock
+guarantee_precision_rule: State only the outcome that the implementation and tests establish
+guarantee_boundary_rule: Name the method transaction process or workflow boundary
+semantic_review_rule: A reviewer must verify the risk fix and guaranteed state against the implementation and evidence
+few_shot_input: Bulk source deletion and expiry cleanup can overlap record publication
+few_shot_summary: Cleanup can overlap record publication and expose stale cache state. The ReadWriteGate gives cleanup exclusive access so SQLite is authoritative when cleanup returns and Redis can remain unavailable.
+few_shot_concepts:
+  - race condition -> concurrent operations can observe or publish conflicting state
+  - ReadWriteGate -> the gate lets record writes share access and gives bulk cleanup exclusive access
+  - SQLite source of truth -> record reads through ContextCache.get validate disposable cache data against SQLite

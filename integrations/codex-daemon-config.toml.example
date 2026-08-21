@@ -1,0 +1,37 @@
+# Cooperative MCP bridge to one trusted loopback Library daemon. Copy this table into
+# the target project's .codex/config.toml and replace the path placeholders. Start the
+# daemon separately before Codex launches this bridge. This file is not active.
+#
+# Use the Python executable from the environment where you installed the Library:
+# Windows: C:/absolute/path/to/library-of-context/.venv/Scripts/python.exe
+# macOS/Linux: /absolute/path/to/library-of-context/.venv/bin/python
+[mcp_servers.library_of_context]
+command = "C:/absolute/path/to/library-of-context/.venv/Scripts/python.exe"
+args = [
+  "-m",
+  "library_of_context.mcp_server",
+  "--daemon-url",
+  "http://127.0.0.1:8765",
+  "--daemon-token-file",
+  "C:/absolute/path/to/library-of-context/data/library-of-context.sqlite.daemon-token",
+  "--namespace",
+  "replace-with-your-project-slug",
+  "--daemon-timeout-seconds",
+  "120",
+]
+cwd = "C:/absolute/path/to/library-of-context"
+startup_timeout_sec = 10
+tool_timeout_sec = 120
+enabled = true
+required = false
+default_tools_approval_mode = "writes"
+enabled_tools = [
+  "library_shelve",
+  "library_shelve_document",
+  "library_consult",
+  "library_desk_refresh",
+  "library_desk_get",
+  "library_desk_watch",
+  "library_desk_stop",
+  "library_stats",
+]
