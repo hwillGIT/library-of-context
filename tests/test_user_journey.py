@@ -42,7 +42,7 @@ class NormalUserCLITests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(completed.returncode, 0, completed.stderr)
-            self.assertEqual(completed.stdout.strip(), "0.3.0")
+            self.assertEqual(completed.stdout.strip(), "0.4.0")
 
     def test_quickstart_is_disposable_and_service_free(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -290,8 +290,14 @@ class CodexIntegrationContractTests(unittest.TestCase):
         instructions = (ROOT / "integrations" / "AGENTS.library.md").read_text(
             encoding="utf-8"
         )
-        self.assertIn("unique, stable `session_id`", instructions)
-        self.assertIn("does not push new context", instructions)
+        self.assertRegex(
+            instructions,
+            r"unique(?:,| and) stable `session_id`",
+        )
+        self.assertRegex(
+            instructions,
+            r"does not (?:push new context|add context to the prompt)",
+        )
         self.assertIn("does not intercept", instructions)
 
 

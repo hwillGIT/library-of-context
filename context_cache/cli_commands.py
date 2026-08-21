@@ -8,10 +8,11 @@ from collections.abc import Callable
 from pathlib import Path
 
 from .cli_config import create_cache
+from .daemon_auth import load_or_create_daemon_token
 from .engine import ContextCache
 from .models import SearchHit
 from .quickstart import run_quickstart
-from .server import run_server
+from .server import ServerDrainTimeout, run_server
 from .swapper import ContextSwapper
 
 CommandHandler = Callable[[argparse.Namespace, ContextCache], None]
@@ -145,7 +146,10 @@ def _discard(args: argparse.Namespace, cache: ContextCache) -> None:
 
 
 def _serve(args: argparse.Namespace, cache: ContextCache) -> None:
-    run_server(cache, args.host, args.port)
+    token_path = Path(args.auth_token_file or f"{args.db}.daemon-token")
+    token = load_or_create_daemon_token(token_path)
+    print(f"Daemon token file: {token_path.resolve()}")
+    run_server(cache, args.host, args.port, auth_token=token)
 
 
 COMMAND_HANDLERS: dict[str, CommandHandler] = {
@@ -170,7 +174,11 @@ def execute_command(args: argparse.Namespace) -> int:
     handler = COMMAND_HANDLERS[command]
     cache = create_cache(args)
     try:
-        handler(args, cache)
+        try:
+            handler(args, cache)
+        except ServerDrainTimeout as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
         return 0
     finally:
         cache.close()

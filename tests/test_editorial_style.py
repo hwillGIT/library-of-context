@@ -8,6 +8,11 @@ SCANNED_SUFFIXES = {".md", ".py", ".ps1", ".toml", ".yaml", ".yml"}
 IGNORED_PARTS = {".git", ".venv", ".ruff_cache", "site", "library_of_context.egg-info"}
 IGNORED_FILES = {
     Path("tests/test_editorial_style.py"),
+    Path("tests/test_technical_language.py"),
+    Path(
+        ".agents/skills/write-timeless-technical-prose/"
+        "references/asd-ste100-software.yaml"
+    ),
 }
 PROHIBITED_PROSE = {
     "requester narration": re.compile(

@@ -14,26 +14,37 @@ from .models import (
     SearchHit,
     WorkingSet,
 )
+from .runtime import LibraryRuntime, RuntimeSettings
+from .scopes import ContextScope, ScopeSelection, ThreadKey
 from .session import VirtualContextSession
 from .swapper import ContextSwapper
+from .thread_state import ThreadCapacityError, ThreadState, ThreadStateRegistry
+from .version import __version__
 
 __all__ = [
+    "__version__",
     "ContextCache",
     "ContextEvent",
     "ContextRecord",
+    "ContextScope",
     "ContextSwapper",
     "ContextWatermarks",
     "GovernedPrompt",
     "GovernedTextAgent",
     "HashingEmbedder",
     "LibraryOfContext",
+    "LibraryRuntime",
     "LibraryContextGovernor",
     "OllamaEmbedder",
     "PromptEnvelope",
     "ReadingDesk",
     "SearchHit",
+    "ScopeSelection",
+    "RuntimeSettings",
+    "ThreadKey",
+    "ThreadCapacityError",
+    "ThreadState",
+    "ThreadStateRegistry",
     "VirtualContextSession",
     "WorkingSet",
 ]
-
-__version__ = "0.3.0"

@@ -8,7 +8,7 @@ import urllib.request
 from pathlib import Path
 
 from context_cache.server import create_server
-from library_of_context import LibraryOfContext
+from library_of_context import ContextScope, LibraryOfContext, RuntimeSettings
 
 
 class ContextGovernorTests(unittest.TestCase):
@@ -29,7 +29,7 @@ class ContextGovernorTests(unittest.TestCase):
                     system_prompt="Keep the current request visible.",
                     event_id="turn-1",
                 )
-                stored = library.store.get_thread_event("default", "turn-1")
+                stored = library.store.get_thread_event("default", "durable", "turn-1")
                 self.assertIsNotNone(stored)
                 assert stored is not None
                 self.assertEqual(stored.content, full_message)
@@ -53,22 +53,29 @@ class ContextGovernorTests(unittest.TestCase):
                 self.assertEqual(watermarks["recorded_through"], 1)
                 self.assertEqual(watermarks["indexed_through"], 1)
                 self.assertEqual(watermarks["pending_events"], 0)
-                event = recovered.store.get_thread_event("default", "turn-1")
+                event = recovered.store.get_thread_event("default", "durable", "turn-1")
                 assert event is not None
-                self.assertIsNotNone(recovered.get(event.record_id))
+                self.assertIsNotNone(
+                    recovered.get(
+                        event.record_id,
+                        scopes=(ContextScope.THREAD,),
+                        session_id="durable",
+                    )
+                )
                 governor.close()
 
     def test_protected_context_survives_recent_ring_eviction(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             with LibraryOfContext(
-                Path(directory) / "library.sqlite", redis_url=""
+                Path(directory) / "library.sqlite",
+                redis_url="",
+                runtime_settings=RuntimeSettings(recent_ring_events=4),
             ) as library:
                 governor = library.open_context_governor(
                     "protected",
                     token_budget=500,
                     recent_token_budget=120,
                     protected_token_budget=120,
-                    recent_ring_events=4,
                     start_worker=False,
                 )
                 decision = governor.protect(
@@ -95,13 +102,16 @@ class ContextGovernorTests(unittest.TestCase):
     def test_bounded_work_ring_spills_losslessly_to_outbox(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "library.sqlite"
-            with LibraryOfContext(path, redis_url="") as library:
+            with LibraryOfContext(
+                path,
+                redis_url="",
+                runtime_settings=RuntimeSettings(outbox_capacity=1),
+            ) as library:
                 governor = library.open_context_governor(
                     "overflow",
                     token_budget=500,
                     recent_token_budget=120,
                     protected_token_budget=80,
-                    work_ring_capacity=1,
                     start_worker=False,
                 )
                 for index in range(8):
@@ -115,13 +125,16 @@ class ContextGovernorTests(unittest.TestCase):
                 self.assertEqual(status["watermarks"]["pending_events"], 8)
                 governor.close()
 
-            with LibraryOfContext(path, redis_url="") as recovered:
+            with LibraryOfContext(
+                path,
+                redis_url="",
+                runtime_settings=RuntimeSettings(outbox_capacity=2),
+            ) as recovered:
                 governor = recovered.open_context_governor(
                     "overflow",
                     token_budget=500,
                     recent_token_budget=120,
                     protected_token_budget=80,
-                    work_ring_capacity=2,
                 )
                 self.assertTrue(governor.flush(timeout=3))
                 status = governor.status()
@@ -145,6 +158,8 @@ class ContextGovernorTests(unittest.TestCase):
                 )
                 with self.assertRaises(ValueError):
                     governor.record("user", "Different turn.", event_id="same")
+                with self.assertRaisesRegex(ValueError, "different thread event"):
+                    governor.protect("Same turn.", event_id="same")
                 governor.close()
 
 
@@ -152,16 +167,22 @@ class GovernorHTTPTests(unittest.TestCase):
     def test_prepare_commit_flush_and_status(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             library = LibraryOfContext(Path(directory) / "library.sqlite", redis_url="")
-            server, swapper = create_server(library, "127.0.0.1", 0)
+            server, swapper = create_server(
+                library,
+                "127.0.0.1",
+                0,
+                auth_token="governor-http-token-000000000000001",
+            )
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
             base = f"http://127.0.0.1:{server.server_address[1]}"
+            authorization = {"Authorization": f"Bearer {server.auth_token}"}
 
             def post(path: str, body: dict[str, object]) -> tuple[int, dict]:
                 request = urllib.request.Request(
                     base + path,
                     data=json.dumps(body).encode("utf-8"),
-                    headers={"Content-Type": "application/json"},
+                    headers={"Content-Type": "application/json", **authorization},
                     method="POST",
                 )
                 with urllib.request.urlopen(request, timeout=3) as response:
@@ -194,9 +215,11 @@ class GovernorHTTPTests(unittest.TestCase):
                     {"session_id": "http-governed", "timeout_seconds": 3},
                 )
                 self.assertTrue(flushed["flushed"])
-                with urllib.request.urlopen(
-                    base + "/context/status/http-governed", timeout=3
-                ) as response:
+                status_request = urllib.request.Request(
+                    base + "/context/status/http-governed",
+                    headers=authorization,
+                )
+                with urllib.request.urlopen(status_request, timeout=3) as response:
                     status = json.loads(response.read())
                 self.assertEqual(status["watermarks"]["recorded_through"], 2)
                 self.assertEqual(status["watermarks"]["indexed_through"], 2)
@@ -210,10 +233,16 @@ class GovernorHTTPTests(unittest.TestCase):
     def test_status_respects_a_non_default_collection(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             library = LibraryOfContext(Path(directory) / "library.sqlite", redis_url="")
-            server, swapper = create_server(library, "127.0.0.1", 0)
+            server, swapper = create_server(
+                library,
+                "127.0.0.1",
+                0,
+                auth_token="governor-status-token-00000000000001",
+            )
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
             base = f"http://127.0.0.1:{server.server_address[1]}"
+            authorization = {"Authorization": f"Bearer {server.auth_token}"}
 
             request = urllib.request.Request(
                 base + "/context/prepare",
@@ -227,15 +256,17 @@ class GovernorHTTPTests(unittest.TestCase):
                         "protected_token_budget": 80,
                     }
                 ).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json", **authorization},
                 method="POST",
             )
             try:
                 with urllib.request.urlopen(request, timeout=3) as response:
                     self.assertEqual(response.status, 200)
-                with urllib.request.urlopen(
-                    base + "/context/status/isolated?collection=project-a", timeout=3
-                ) as response:
+                status_request = urllib.request.Request(
+                    base + "/context/status/isolated?collection=project-a",
+                    headers=authorization,
+                )
+                with urllib.request.urlopen(status_request, timeout=3) as response:
                     status = json.loads(response.read())
                 self.assertEqual(status["collection"], "project-a")
                 self.assertEqual(status["watermarks"]["recorded_through"], 1)

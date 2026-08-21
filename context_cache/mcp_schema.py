@@ -29,12 +29,24 @@ def _object_schema(
 
 COLLECTION = {
     "type": "string",
+    "maxLength": 512,
     "description": "Optional library collection/namespace; defaults to the configured collection.",
 }
 CATALOG = {
     "type": "object",
     "description": "JSON catalog metadata or exact-match catalog filters.",
     "additionalProperties": True,
+}
+SCOPE = {
+    "type": "string",
+    "enum": ["thread", "project", "team"],
+    "description": "Visibility boundary for a shelved book.",
+}
+TEAM_IDS = {
+    "type": "array",
+    "items": {"type": "string", "minLength": 1},
+    "maxItems": 100,
+    "description": "Team identifiers authorized by the calling gateway.",
 }
 
 
@@ -73,6 +85,9 @@ TOOLS = [
                 "source": {"type": "string", "default": "mcp"},
                 "importance": {"type": "number", "minimum": 0, "maximum": 1},
                 "shelf_life_seconds": {"type": "number", "minimum": 0},
+                "scope": SCOPE,
+                "owner_session_id": {"type": "string", "minLength": 1},
+                "team_id": {"type": "string", "minLength": 1},
             },
             ["text"],
         ),
@@ -92,6 +107,9 @@ TOOLS = [
                 "chapter_tokens": {"type": "integer", "minimum": 32},
                 "overlap_tokens": {"type": "integer", "minimum": 0},
                 "replace_edition": {"type": "boolean", "default": False},
+                "scope": SCOPE,
+                "owner_session_id": {"type": "string", "minLength": 1},
+                "team_id": {"type": "string", "minLength": 1},
             },
             ["text", "source"],
         ),
@@ -101,7 +119,7 @@ TOOLS = [
     ),
     _tool(
         "library_consult",
-        "Search the off-desk Library with hybrid vector, lexical, importance, and recency ranking without changing the reading desk.",
+        "Search the off-desk Library without changing the reading desk. Returns bounded untrusted excerpts, lightweight record references, and ranking scores.",
         _object_schema(
             {
                 "subject": {"type": "string", "minLength": 1},
@@ -109,6 +127,7 @@ TOOLS = [
                 "collection": COLLECTION,
                 "catalog_filters": CATALOG,
                 "minimum_relevance": {"type": "number", "minimum": 0, "maximum": 1},
+                "team_ids": TEAM_IDS,
             },
             ["subject"],
         ),
@@ -117,11 +136,11 @@ TOOLS = [
     ),
     _tool(
         "library_desk_refresh",
-        "Replace a session's bounded reading desk with books relevant to the current subject. Returns the prompt-ready context plus swapped-in, swapped-out, and retained IDs.",
+        "Replace a session's bounded reading desk with books relevant to the current subject. Returns one trust-marked context block plus bounded book references and swap IDs.",
         _object_schema(
             {
                 "subject": {"type": "string", "minLength": 1},
-                "session_id": {"type": "string", "default": "codex"},
+                "session_id": {"type": "string", "minLength": 1},
                 "token_budget": {"type": "integer", "minimum": 64},
                 "max_books": {"type": "integer", "minimum": 1, "maximum": 100},
                 "collection": COLLECTION,
@@ -129,10 +148,12 @@ TOOLS = [
                 "keep_open": {
                     "type": "array",
                     "items": {"type": "string"},
+                    "maxItems": 100,
                     "description": "Book IDs that must be considered first for the desk.",
                 },
+                "team_ids": TEAM_IDS,
             },
-            ["subject"],
+            ["subject", "session_id"],
         ),
         read_only=True,
         idempotent=True,
@@ -142,9 +163,10 @@ TOOLS = [
         "Read the latest bounded reading desk snapshot for a session.",
         _object_schema(
             {
-                "session_id": {"type": "string", "default": "codex"},
+                "session_id": {"type": "string", "minLength": 1},
                 "collection": COLLECTION,
-            }
+            },
+            ["session_id"],
         ),
         read_only=True,
         idempotent=True,
@@ -155,15 +177,20 @@ TOOLS = [
         _object_schema(
             {
                 "subject": {"type": "string", "minLength": 1},
-                "session_id": {"type": "string", "default": "codex"},
+                "session_id": {"type": "string", "minLength": 1},
                 "interval_seconds": {"type": "number", "minimum": 1},
                 "token_budget": {"type": "integer", "minimum": 64},
                 "max_books": {"type": "integer", "minimum": 1, "maximum": 100},
                 "collection": COLLECTION,
                 "catalog_filters": CATALOG,
-                "keep_open": {"type": "array", "items": {"type": "string"}},
+                "keep_open": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "maxItems": 100,
+                },
+                "team_ids": TEAM_IDS,
             },
-            ["subject"],
+            ["subject", "session_id"],
         ),
         read_only=False,
         idempotent=True,
@@ -173,9 +200,10 @@ TOOLS = [
         "Stop periodic refresh for a reading-desk session. The current snapshot remains available.",
         _object_schema(
             {
-                "session_id": {"type": "string", "default": "codex"},
+                "session_id": {"type": "string", "minLength": 1},
                 "collection": COLLECTION,
-            }
+            },
+            ["session_id"],
         ),
         read_only=False,
         idempotent=True,
@@ -185,7 +213,7 @@ TOOLS = [
         "Shelve one conversation message for a virtual-context session. External model gateways should record assistant replies after each response.",
         _object_schema(
             {
-                "session_id": {"type": "string", "default": "codex"},
+                "session_id": {"type": "string", "minLength": 1},
                 "role": {
                     "type": "string",
                     "enum": ["system", "developer", "user", "assistant", "tool"],
@@ -194,7 +222,7 @@ TOOLS = [
                 "collection": COLLECTION,
                 "importance": {"type": "number", "minimum": 0, "maximum": 1},
             },
-            ["role", "content"],
+            ["session_id", "role", "content"],
         ),
         read_only=False,
         idempotent=False,
@@ -204,7 +232,7 @@ TOOLS = [
         "Build a complete stateless model-input envelope from bounded recent turns plus a replacement reading desk. Full history remains shelved on disk instead of growing the live prompt.",
         _object_schema(
             {
-                "session_id": {"type": "string", "default": "codex"},
+                "session_id": {"type": "string", "minLength": 1},
                 "user_message": {"type": "string"},
                 "system_prompt": {"type": "string"},
                 "collection": COLLECTION,
@@ -212,7 +240,8 @@ TOOLS = [
                 "recent_token_budget": {"type": "integer", "minimum": 64},
                 "max_books": {"type": "integer", "minimum": 1, "maximum": 100},
                 "record_user": {"type": "boolean", "default": True},
-            }
+            },
+            ["session_id"],
         ),
         read_only=False,
         idempotent=False,
@@ -222,7 +251,7 @@ TOOLS = [
         "Durably append a user turn, then return the complete bounded semantic-paging envelope for the next model call. Send only the returned messages to the model.",
         _object_schema(
             {
-                "session_id": {"type": "string", "default": "codex"},
+                "session_id": {"type": "string", "minLength": 1},
                 "user_message": {"type": "string", "minLength": 1},
                 "focus": {"type": "string"},
                 "system_prompt": {"type": "string"},
@@ -236,11 +265,12 @@ TOOLS = [
                 "protected": {"type": "boolean", "default": False},
                 "event_id": {
                     "type": "string",
+                    "maxLength": 512,
                     "description": "Optional caller idempotency key for this turn.",
                 },
                 "strict_freshness": {"type": "boolean", "default": False},
             },
-            ["user_message"],
+            ["session_id", "user_message"],
         ),
         read_only=False,
         idempotent=False,
@@ -250,7 +280,7 @@ TOOLS = [
         "Durably append the assistant or tool result after a governed model call. The outbox indexes it asynchronously while the recent ring makes it immediately visible.",
         _object_schema(
             {
-                "session_id": {"type": "string", "default": "codex"},
+                "session_id": {"type": "string", "minLength": 1},
                 "role": {
                     "type": "string",
                     "enum": ["assistant", "tool", "user", "developer", "system"],
@@ -267,10 +297,11 @@ TOOLS = [
                 "protected": {"type": "boolean"},
                 "event_id": {
                     "type": "string",
+                    "maxLength": 512,
                     "description": "Optional caller idempotency key for this result.",
                 },
             },
-            ["content"],
+            ["session_id", "content"],
         ),
         read_only=False,
         idempotent=False,
@@ -280,7 +311,7 @@ TOOLS = [
         "Persist critical instructions, decisions, active plans, or unresolved state as protected context that remains eligible for every governed prompt until released.",
         _object_schema(
             {
-                "session_id": {"type": "string", "default": "codex"},
+                "session_id": {"type": "string", "minLength": 1},
                 "content": {"type": "string", "minLength": 1},
                 "role": {
                     "type": "string",
@@ -294,9 +325,9 @@ TOOLS = [
                 "protected_token_budget": {"type": "integer", "minimum": 0},
                 "max_books": {"type": "integer", "minimum": 1, "maximum": 100},
                 "importance": {"type": "number", "minimum": 0, "maximum": 1},
-                "event_id": {"type": "string"},
+                "event_id": {"type": "string", "maxLength": 512},
             },
-            ["content"],
+            ["session_id", "content"],
         ),
         read_only=False,
         idempotent=False,
@@ -306,11 +337,15 @@ TOOLS = [
         "Release one protected event so it can be paged normally. The durable event is retained.",
         _object_schema(
             {
-                "session_id": {"type": "string", "default": "codex"},
-                "event_id": {"type": "string", "minLength": 1},
+                "session_id": {"type": "string", "minLength": 1},
+                "event_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512,
+                },
                 "collection": COLLECTION,
             },
-            ["event_id"],
+            ["session_id", "event_id"],
         ),
         read_only=False,
         idempotent=True,
@@ -320,9 +355,10 @@ TOOLS = [
         "Read context-governor watermarks, queue occupancy, prompt pressure, and worker health for one agent thread.",
         _object_schema(
             {
-                "session_id": {"type": "string", "default": "codex"},
+                "session_id": {"type": "string", "minLength": 1},
                 "collection": COLLECTION,
-            }
+            },
+            ["session_id"],
         ),
         read_only=True,
         idempotent=True,
@@ -332,10 +368,11 @@ TOOLS = [
         "Wait until this thread's durable outbox has been embedded and indexed through its recorded watermark.",
         _object_schema(
             {
-                "session_id": {"type": "string", "default": "codex"},
+                "session_id": {"type": "string", "minLength": 1},
                 "collection": COLLECTION,
                 "timeout_seconds": {"type": "number", "minimum": 0, "maximum": 60},
-            }
+            },
+            ["session_id"],
         ),
         read_only=False,
         idempotent=True,

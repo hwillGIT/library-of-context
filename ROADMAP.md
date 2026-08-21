@@ -1,30 +1,40 @@
 # Roadmap and Research Agenda
 
-The Library of Context is an alpha and a design collaboration. The roadmap is ordered
-by correctness and evidence, not by feature novelty.
+The Library of Context has alpha status. The roadmap orders work by correctness and
+evidence. The [glossary](docs/GLOSSARY.md) defines shared terms.
 
-Roadmap items are not mandatory dependencies for every installation. Milestone 1 is the
-evidence and correctness foundation. Milestones 2 and 3 address independent pressures:
-catalog cardinality and concurrent local agents. Milestone 4 is context-quality
-research. Milestone 5 exists only for teams that need cross-workstation knowledge.
+Roadmap items are not requirements for every installation. Milestone 1 establishes
+correctness evidence. Milestones 2 and 3 address catalog size and concurrent local
+agents. Milestone 4 covers context-quality research. Milestone 5 serves teams with a
+cross-workstation need.
 
-Read [Why These Improvements?](docs/WHY_THE_ROADMAP.md) for the affirmative case,
-skeptical case, alternatives, adoption triggers, and evidence gates. Substantial
-proposals should use the [decision brief template](docs/DECISION_BRIEF_TEMPLATE.md).
-The [related-work landscape](docs/RELATED_WORK.md) supplies comparative evidence;
-inclusion there is neither adoption nor a roadmap commitment.
+Read [Why These Improvements?](docs/WHY_THE_ROADMAP.md) for supporting and opposing
+cases. It also defines alternatives, adoption triggers, and evidence gates. Use the
+[decision brief template](docs/DECISION_BRIEF_TEMPLATE.md) for a substantial proposal.
 
-## Shipped foundation — 0.3
+The [related-work landscape](docs/RELATED_WORK.md) provides comparative evidence. An
+entry there does not mean adoption or commitment.
 
-- SQLite/RAM/optional Redis memory hierarchy.
-- Hybrid FTS and exact-vector retrieval.
+## Implemented foundation — 0.4
+
+- SQLite, random-access memory, and optional Redis hierarchy.
+- Hybrid full-text search and exact-vector retrieval.
 - Token-bounded reading desks and swap deltas.
 - Durable thread events and transactional outbox.
 - Token-aware recent ring and bounded asynchronous work ring.
 - Context governor `prepare -> model -> commit` lifecycle.
 - Protected context, idempotent event IDs, recovery, and watermarks.
-- Python, HTTP, CLI, and MCP surfaces.
-- Common-term FTS join removal and oversized-message budget protection.
+- Python, Hypertext Transfer Protocol, command-line, and Model Context Protocol
+  interfaces.
+- Common-term full-text join removal and large-message budget protection.
+- Explicit thread identity and thread/project/team retrieval scopes.
+- Copy-based promotion with source preservation and provenance.
+- One shared runtime with fixed outbox workers, one desk scheduler, bounded thread
+  state, and bounded desk snapshots.
+- Atomic outbox claims, leases, ordered work, retry jitter, and terminal quarantine.
+- Loopback daemon and thin MCP bridges with exclusive database ownership and bounded
+  request admission.
+- Staged SQLite migration through schema version 6.
 
 ## Milestone 1 — measurable retrieval
 
@@ -32,63 +42,69 @@ inclusion there is neither adoption nor a roadmap commitment.
 - Define agent-thread retrieval datasets and expected evidence.
 - Add tokenizer adapters and enforce actual model-token budgets.
 - Complete cache-key identity and index-version tracking.
-- Push metadata and ACL predicates into candidate generation.
-- Add structured metrics for latency, candidates, queue age, lag, RSS, and disk.
+- Apply metadata and access-control filters during candidate generation.
+- Add metrics for latency, candidates, queue age, lag, resident memory, and disk use.
 
-**Why:** without comparable measurements, a faster retriever may quietly lose important
-context, and an architectural rewrite may optimize the wrong bottleneck. Token and cache
-identity are also correctness concerns, not optional tuning.
+**Reason:** A faster retriever can lose important context without comparable
+measurements. A design change can also address the wrong limit. Token and cache
+identity affect correctness.
 
-**Why not overbuild it:** a full Cartesian benchmark matrix and fleet telemetry would be
-expensive and could expose private labels. Begin with deterministic local workloads,
-adversarial token cases, low-cardinality metrics, and scheduled scale suites.
+**Reason to limit scope:** A full test matrix and fleet telemetry add cost. They can
+also expose private labels. Start with controlled local workloads, difficult token
+cases, small metrics sets, and scheduled scale tests.
 
-**Exit gate:** published benchmark results and zero tested prompt-budget violations.
+**Exit gate:** Publish benchmark results. The tested workloads must have no prompt-budget
+violations.
 
 ## Milestone 2 — bounded search work
 
 - Introduce a vector-index adapter interface.
-- Implement and compare at least one local ANN backend.
-- Union bounded ANN and FTS candidates, then exact-rerank.
+- Implement and compare one local approximate nearest neighbor (ANN) backend.
+- Combine bounded ANN and full-text candidates. Apply exact reranking.
 - Add diversity and duplicate suppression.
 - Batch embeddings by token count and use pooled connections.
 - Publish immutable source versions atomically.
 
-**Why:** exact vector scoring grows with the namespace, redundant candidates waste
-the desk, and per-item embedding work accumulates round trips. Bounded candidates and
-atomic editions address measured work and visibility problems.
+**Reason:** Exact vector-scoring work increases with namespace size. Repeated candidates
+consume desk capacity. Per-item embedding also adds round trips. Bounded candidates and
+atomic editions address these measured problems.
 
-**Why not automatically:** ANN is approximate, platform-sensitive, and operationally
-heavier than exact scoring. Batching adds visibility lag and partial-failure policy.
-Small catalogs should retain exact search when it meets their latency and memory target.
+**Reason for optional use:** ANN is approximate and platform-sensitive. It requires more
+operations than exact scoring. Batching adds visibility delay and partial-failure rules.
 
-**Adoption trigger:** the exact path crosses the declared cold-query or peak-memory SLO,
-or source replacement and embedding lag become observable under the target workload.
+Keep exact search for a small catalog that meets its latency and memory targets.
 
-**Exit gate:** candidate work and peak retrieval memory are bounded independently of
-catalog size, with recall@12 at or above the agreed reference target.
+**Adoption trigger:** Adopt ANN when exact search exceeds a declared latency or memory
+service-level objective. Embedding delay or source-replacement delay can also trigger
+adoption.
 
-## Milestone 3 — workstation daemon
+**Exit gate:** Candidate work and peak retrieval memory do not depend on catalog size.
+Recall at 12 results meets the agreed target.
 
-- Run one supervised Library daemon per workstation.
-- Replace per-governor workers and timer threads with one scheduler and fixed pools.
-- Partition work by project/thread while preserving thread order.
-- Add priority lanes, queue admission control, coalescing, and stale-result rejection.
-- Add session/desk TTLs, quotas, graceful shutdown, and low-disk policy.
-- Provide thin MCP, HTTP, and local IPC bridges.
+## Milestone 3 — workstation operations
 
-**Why:** several local agents otherwise duplicate caches, workers, outbox scans, and
-connections. One owner can enforce fair queues, quotas, health, and recovery.
+- Package and supervise the daemon with platform service managers.
+- Add weighted priority lanes and fair-share scheduling under mixed interactive and bulk
+  load.
+- Add disk quotas, low-disk admission, backup/restore checks, and operator remediation.
+- Version daemon upgrades and mixed-client compatibility.
+- Evaluate authenticated interprocess communication when trusted loopback is
+  insufficient.
 
-**Why not automatically:** a daemon adds installation, supervision, IPC compatibility,
-local authentication, upgrades, and a workstation failure boundary. Embedded mode is
-the simpler design for one small process.
+**Reason:** The shared runtime bounds caches, workers, outbox scans, and connections.
+Workstation operation also needs supervision, fair queues, disk policy, safe upgrades,
+and recovery.
 
-**Adoption trigger:** measured duplicate work, aggregate cache memory, thread count,
-SQLite contention, or queue age breaks the declared multi-agent workstation profile.
-Agent count alone is not sufficient.
+**Reason for optional use:** Service installation, authentication, upgrades, and resource
+policy add operational responsibility. Embedded mode has fewer components for one
+small process.
 
-**Exit gate:** declared ten-agent workload meets local append, prompt, and recovery SLOs.
+**Adoption trigger:** Adopt daemon operations when measured resource use exceeds the
+declared workstation profile. Relevant measures include duplicate work, cache memory,
+thread count, SQLite contention, and queue age. Agent count alone is insufficient.
+
+**Exit gate:** The declared ten-agent workload meets append, prompt, and recovery
+service-level objectives.
 
 ## Milestone 4 — context intelligence
 
@@ -96,47 +112,53 @@ Agent count alone is not sufficient.
 - Pluggable protection and release policies with visible explanations.
 - Branch/fork inheritance and explicit context snapshots.
 - Summaries as versioned navigation aids while retaining originals.
-- Retrieval routing across thread, personal, and project scopes.
+- Adaptive retrieval routing across thread, personal, project, and team indexes.
 - Quality evaluation for focus shifts, stale state, contradictions, and supersession.
 
-**Why:** raw retrieval may repeatedly rediscover objectives and decisions poorly, while
-explicit snapshots can make forks reproducible and scope selection explainable.
+**Reason:** Raw retrieval can repeatedly miss objectives and decisions. Explicit
+snapshots can make forks reproducible. They can also explain scope selection.
 
-**Why not automatically:** summaries and capsules can hallucinate, hide qualifications,
-or preserve superseded instructions. Automatic protection can fill the prompt with
-stale state. Derived context must remain versioned, explainable, and linked to originals.
+**Reason for optional use:** Summaries and capsules can add false statements or hide
+qualifications. They can preserve replaced instructions. Automatic protection can fill
+the prompt with stale state.
 
-**Adoption trigger:** curated long-thread evaluations demonstrate continuity, branch, or
-scope failures that simpler recent/protected/retrieved paging does not solve.
+Derived context must remain versioned and explainable. It must link to its source.
 
-**Exit gate:** agent-thread evaluations demonstrate higher continuity scores than basic
-recent/protected/retrieved paging without hidden-instruction or stale-context
-regressions.
+**Adoption trigger:** Adopt context intelligence when long-thread tests show continuity,
+branch, or scope failures. Basic recent, protected, and retrieved paging must not solve
+those failures.
+
+**Exit gate:** Agent-thread tests show higher continuity than basic paging. They show no
+increase in hidden instructions or stale context.
 
 ## Milestone 5 — selective team memory
 
 - Define a knowledge-card and promotion-review format.
 - Add device identity, projects, principals, scopes, provenance, and tombstones.
-- Enforce authorization before retrieval and hydration.
+- Enforce authorization before retrieval and before loading complete records.
 - Implement idempotent sync outbox/inbox and durable cursor recovery.
 - Compare Redis Streams, NATS JetStream, and alternatives with failure tests.
 - Keep the team plane optional and outside the local prompt critical path.
 
-**Why:** teams need reusable decisions and evidence across workstations, with provenance,
-authorization, replay, deletion, and offline recovery.
+**Reason:** Teams need reusable decisions and evidence across workstations. Shared
+knowledge needs origin, authorization, replay, deletion, and offline recovery.
 
-**Why not automatically:** synchronizing raw threads expands privacy and compliance
-scope. A broker transports events but does not define promotion, identity, conflicts, or
-revocation. Reviewed cards and a simple authenticated database sync API may satisfy a
-small team's requirements.
+**Reason for optional use:** Synchronizing raw threads increases privacy and compliance
+scope. A broker transports events. It does not define promotion, identity, conflicts,
+or revocation.
 
-**Adoption trigger:** multiple principals need approved knowledge across independently
-failing devices. Authorization is mandatory before shared retrieval; a broker is added
-only when fan-out, event rate, or replay requirements exceed the simpler sync path.
+Reviewed cards and an authenticated database synchronization interface can meet a small
+team's needs.
 
-**Exit gate:** current-policy authorization tests show zero cross-project leakage;
-offline nodes continue local prompt construction; and the deployment explicitly chooses
-an authorization-lease or maximum-revocation-lag contract for cached team data.
+**Adoption trigger:** Adopt team memory when multiple users need approved knowledge
+across independent devices. Authorization is required before shared retrieval.
+
+Add a broker only when distribution, event rate, or replay exceeds direct
+synchronization limits.
+
+**Exit gate:** Authorization tests show no cross-project exposure. Offline nodes continue
+local prompt construction. The deployment defines authorization-lease or maximum
+revocation-delay behavior for cached team data.
 
 ## Questions looking for owners
 
@@ -149,7 +171,7 @@ an authorization-lease or maximum-revocation-lag contract for cached team data.
 
 ### Retrieval quality
 
-- What benchmark represents real agentic recall rather than generic document QA?
+- What benchmark represents agent-thread recall instead of document question answering?
 - How should recency compete with durable decisions and superseding facts?
 - When should a retrieval miss trigger clarification instead of speculative recall?
 - How should the system quantify provenance and confidence in the prompt?
@@ -163,8 +185,9 @@ an authorization-lease or maximum-revocation-lag contract for cached team data.
 
 ### Systems engineering
 
-- Which local ANN implementation provides the best reliability-to-complexity ratio?
-- Can a single daemon safely support many agents without becoming a workstation SPOF?
+- Which local ANN implementation meets the declared reliability and complexity limits?
+- Can one daemon support many agents without becoming a workstation single point of
+  failure?
 - Which queue metrics and backpressure signals are understandable to agent developers?
 - What recovery guarantees are realistic under abrupt power loss?
 
@@ -186,7 +209,8 @@ an authorization-lease or maximum-revocation-lag contract for cached team data.
 
 - Open a **Research question** issue for an unresolved design problem.
 - Include reproducible measurements with performance proposals.
-- Use an RFC issue before large schema, broker, or retrieval-policy changes.
+- Use a request for comments issue before a large schema, broker, or retrieval-policy
+  change.
 - Contribute small adapters behind interfaces rather than coupling the core to a vendor.
 - Add failure and privacy tests with every distributed-systems feature.
 

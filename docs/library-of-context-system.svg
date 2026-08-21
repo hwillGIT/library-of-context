@@ -80,7 +80,7 @@
   <g filter="url(#shadow)">
     <rect x="610" y="198" width="300" height="205" rx="24" class="panel"/>
     <text x="640" y="240" class="sans label ink">L2 · NEARBY STACKS</text>
-    <text x="640" y="269" class="sans small muted">Local Redis · shared hot set</text>
+    <text x="640" y="269" class="sans small muted">Local Redis · runtime hot set</text>
     <g transform="translate(642 304)">
       <rect x="0" y="56" width="224" height="30" rx="7" fill="#9cc9be"/>
       <rect x="18" y="25" width="206" height="30" rx="7" fill="#62a79e"/>

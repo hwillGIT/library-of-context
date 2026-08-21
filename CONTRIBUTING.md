@@ -1,25 +1,38 @@
 # Contributing
 
-Thank you for helping build the Library of Context. Contributions are welcome from AI
-application developers, retrieval researchers, database and distributed-systems
-engineers, privacy specialists, technical writers, and curious users.
+The project welcomes contributions from developers, researchers, engineers, privacy
+specialists, technical writers, and users. The
+[glossary](docs/GLOSSARY.md) defines shared technical terms.
+
+Follow the [technical language guide](docs/TECHNICAL_LANGUAGE.md) and the
+[skill profile](.agents/skills/write-timeless-technical-prose/SKILL.md). Preserve code
+identifiers and quoted text exactly.
+
+For dense engineering text, name the component and its action. Preserve concurrency
+ownership, operation order, atomic boundaries, failure behavior, and resource limits.
 
 ## Start with the design contract
 
-Changes must preserve these invariants:
+Each change must preserve these invariants:
 
-- acknowledged context is durable before it can leave the model prompt;
-- prompt size is bounded;
-- recent unindexed events are visible;
-- bounded queue overflow never becomes durable data loss;
-- SQLite is authoritative in local mode;
-- remote/team services do not become mandatory for local prompt construction;
-- authorization is applied before shared-context hydration.
+- The system stores acknowledged context before it removes that context from a model
+  prompt.
+- The system bounds each prompt.
+- The system makes recent unindexed events visible.
+- A full bounded queue does not cause durable data loss.
+- SQLite is the authoritative local store.
+- Local prompt construction does not require a remote or team service.
+- The system authorizes shared context before it loads that context.
 
-Read [ARCHITECTURE.md](ARCHITECTURE.md) and
-[docs/CONTEXT_GOVERNOR.md](docs/CONTEXT_GOVERNOR.md) before changing the lifecycle.
-Read [Why These Improvements?](docs/WHY_THE_ROADMAP.md) before implementing a roadmap
-item. Each item has an adoption trigger and an evidence gate.
+Read [ARCHITECTURE.md](ARCHITECTURE.md) before you change the lifecycle. Also read the
+[context governor guide](docs/CONTEXT_GOVERNOR.md).
+
+Read [Why These Improvements?](docs/WHY_THE_ROADMAP.md) before you implement a roadmap
+item. Each item specifies an adoption trigger and an evidence gate.
+
+Follow [ADR 0001](docs/adr/0001-thread-scope-and-shared-runtime.md) for changes to
+thread identity, scope, promotion, runtime ownership, or schema. Follow the
+[contributor quality workflow](docs/DEVELOPMENT_WORKFLOW.md).
 
 ## Development setup
 
@@ -43,59 +56,72 @@ python3 -m venv .venv
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-No external dependency or Redis service is needed for the default test suite. To run
-the live Redis integration test:
+The default test suite does not require an external dependency or Redis service. Redis
+is an in-memory data store. Use this command for the live Redis integration test:
 
 ```powershell
 $env:CONTEXT_CACHE_TEST_REDIS = "1"
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-Do not run this against a shared production Redis instance.
+Do not run this test against a shared production Redis instance.
 
 ## Good first contribution areas
 
-- Add adversarial prompt-budget tests for code, CJK, and long tool payloads.
+- Add prompt-budget tests for code, Chinese, Japanese, Korean, and long tool payloads.
 - Improve error messages and examples.
 - Add platform setup notes for Linux and macOS.
 - Build benchmark corpus generators and machine-readable result output.
 - Add queue, crash, retry, Redis-loss, and disk-pressure tests.
 - Improve the diagrams and contributor documentation.
 
-Larger areas needing design discussion include ANN adapters, model tokenizers, daemon
-topology, scope/ACL routing, knowledge promotion, and team broker selection.
+Discuss high-impact work before implementation. This work includes approximate nearest
+neighbor adapters, model tokenizers, daemon supervision, fair scheduling, access
+control, knowledge promotion, and team message brokers.
 
 ## Issue and RFC workflow
 
 - Use a bug issue for reproducible incorrect behavior.
-- Use a research-question issue when the desired behavior is not yet known.
-- Use a feature issue for bounded additions with a clear contract.
-- Open an RFC issue before changing durable schema semantics, ordering, privacy scope,
-  broker guarantees, prompt policy, or public APIs.
+- Use a research issue when the required behavior is unknown.
+- Use a feature issue for a bounded addition with a clear contract.
+- Open a request for comments (RFC) issue for a high-impact change.
 
-An RFC should explain the problem, constraints, at least two viable options, failure
-modes, migration path, security implications, performance/quality evaluation, and open
+An RFC must explain the problem and constraints. It must describe at least two viable
+options. It must cover failure modes, migration, security, evaluation, and open
 questions.
 
-For a substantial improvement, copy the
-[Improvement Decision Brief Template](docs/DECISION_BRIEF_TEMPLATE.md). The brief must
-include both **why** and **why not**, non-goals, the option to defer, a measurable adoption
-trigger, an evidence gate, new failure modes, compatibility, rollback, and operational
-ownership. “This architecture is more scalable” is not an adoption trigger.
+High-impact changes affect schema meaning, ordering, privacy scope, broker guarantees,
+prompt policy, or a public application programming interface.
+
+Copy the [Decision Brief Template](docs/DECISION_BRIEF_TEMPLATE.md) for a substantial
+change. Explain why the change is useful. Explain why the baseline can remain
+preferable.
+
+Identify non-goals and the option to defer. Define a measurable adoption trigger and
+an evidence gate. Describe failure modes, compatibility, rollback, and operational
+ownership. A general scale claim is not an adoption trigger.
 
 ## Pull requests
 
-Keep a pull request focused. Include:
+Keep each pull request focused. Include:
 
-1. the problem and intended behavior;
-2. implementation and important trade-offs;
-3. tests, including recovery or failure tests when relevant;
-4. documentation for public behavior;
-5. benchmark and retrieval-quality evidence for performance changes;
-6. compatibility or migration notes for schema/API changes.
+- A plain-English technical summary that states the failure risk, mechanical fix, and
+  guaranteed state in that order.
+- At least three key-concept bullets that define terms and their runtime impact.
 
-Avoid unrelated formatting or dependency changes. New runtime dependencies need a clear
-benefit, maintenance assessment, license check, and dependency-free fallback discussion.
+Keep the hidden risk, fix, and state markers in the pull request template. The
+automated check validates structure and sentence limits. Reviewers validate technical
+accuracy against the implementation, tests, and evidence.
+
+1. the problem and intended behavior.
+2. the implementation and important trade-offs.
+3. relevant recovery and failure tests.
+4. documentation for public behavior.
+5. latency and retrieval-quality evidence for performance changes.
+6. compatibility or migration notes for schema or interface changes.
+
+Do not include unrelated formatting or dependency changes. Explain the value of each
+runtime dependency. Assess maintenance, licensing, and a dependency-free alternative.
 
 ## Testing expectations
 
@@ -106,60 +132,66 @@ python -m compileall -q context_cache library_of_context
 python -m unittest discover -s tests -v
 ```
 
-Lifecycle changes should test:
+Test these conditions for a lifecycle change:
 
-- durable-before-prompt ordering;
-- idempotent retries;
-- prompt-budget enforcement;
-- recent-overlay visibility before indexing;
-- work-ring overflow and outbox recovery;
-- protected-context behavior;
-- restart recovery and watermarks;
+- storage before prompt removal.
+- idempotent retries.
+- prompt-budget enforcement.
+- recent-event visibility before indexing.
+- work-ring overflow and outbox recovery.
+- protected-context behavior.
+- restart recovery and watermarks.
 - HTTP and MCP contract compatibility when applicable.
 
-Retrieval optimizations must report both latency/resource changes and quality changes
-against the exact scorer.
+HTTP means Hypertext Transfer Protocol. MCP means Model Context Protocol.
+
+Test negative scope access for thread and runtime changes. Test stable
+`ThreadKey(collection, session_id)` routing. Test fixed worker counts and bounded
+registries.
+
+Test claim expiration, reclaim, terminal quarantine, and explicit retry. Test exclusive
+daemon ownership of the database.
+
+A retrieval optimization must report latency, resource use, and quality. Use the exact
+scorer in the comparison.
 
 ## Code style
 
-- Support Python 3.11 and newer.
-- Prefer standard-library implementations in the core.
+- Support Python 3.11 and later versions.
+- Prefer Python standard-library implementations in the core.
 - Use type hints and small explicit data contracts.
-- Favor plain technical English and document failure behavior.
+- Use plain technical English.
+- Document failure behavior.
 - Keep provider-specific code behind adapters.
-- Avoid silently weakening durability, privacy, ordering, or budget guarantees.
+- Do not weaken durability, privacy, ordering, or budget guarantees without notice.
 
 ## Editorial standard
 
-Write explanatory documentation, examples, help text, docstrings, and comments in one
-editorial present. Describe the system contract and operational rationale, not the
-sequence of edits or the author's process. Do not refer to the prompt, requester,
-drafting process, or refactoring process. Do not describe when one section, component,
-example, or explanation was added relative to another. Present the complete structure
-directly.
+Write explanatory material in one editorial present. Describe the system contract and
+operational reasons. Do not narrate the prompt, author process, or edit sequence. Do not
+state when explanatory content entered the repository relative to other content.
 
-Put completed change history in `CHANGELOG.md`; capability state and future sequence in
-the status and roadmap documents; version transitions in compatibility or migration
-sections; and publication or access dates in citations. Preserve time-relative words
-when they identify actual runtime state.
+Put completed history in `CHANGELOG.md`. Put capability state and future sequence in
+status and roadmap documents. Put version transitions in migration or compatibility
+sections. Put publication and access dates in citations.
 
 Use the repository's
 [timeless technical prose skill](.agents/skills/write-timeless-technical-prose/SKILL.md)
-for the full editing and review procedure. Prefer concrete mechanisms and measurable
-claims over promotional terms or unsupported comparisons.
-Do not use updated, latest, or improved as freestanding labels for explanatory material.
-State the resulting behavior, version boundary, or measured comparison instead.
-Use sequence words only when they specify technical order, including procedures,
-runtime transitions, dependencies, migrations, and evaluation protocols.
+for the editing and review procedure. Use active voice and American spelling. Limit
+descriptive sentences to 25 words. Limit procedural sentences to 20 words.
+
+Put one instruction in each procedural sentence. Do not use contractions or
+semicolons. Limit each paragraph to six sentences and one topic. Define specialized
+terms and acronyms at their first use.
 
 ## Security and privacy
 
-Do not include real prompts, credentials, tokens, private documents, or customer data in
-issues, fixtures, logs, or benchmark corpora. Follow [SECURITY.md](SECURITY.md) for
-vulnerability reports.
+Do not put private or secret data in issues, fixtures, logs, or benchmark sets. This
+data includes real prompts, credentials, tokens, private documents, and customer data.
+Follow [SECURITY.md](SECURITY.md) for vulnerability reports.
 
 ## Community
 
-Be direct, curious, and constructive. Critique designs with evidence and alternatives.
-Assume contributors are trying to improve the system, and make disagreement useful.
-Participation is governed by [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+Communicate directly and constructively. Critique designs with evidence and
+alternatives. Treat disagreement as a source of testable options. Follow the
+[Code of Conduct](CODE_OF_CONDUCT.md).

@@ -36,7 +36,10 @@ class QueueAndBudgetTests(unittest.TestCase):
         self.assertTrue(work.offer("a"))
         self.assertTrue(work.offer("a"))
         self.assertFalse(work.offer("b"))
-        self.assertEqual(work.stats(), {"queued": 1, "capacity": 1, "occupancy": 1.0})
+        self.assertEqual(
+            work.stats(),
+            {"queued": 1, "pending": 1, "capacity": 1, "occupancy": 1.0},
+        )
 
         item = work.get(timeout=0.01)
         self.assertEqual(item, "a")

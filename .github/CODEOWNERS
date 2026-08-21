@@ -1,0 +1,6 @@
+# Require repository-owner review for CI and technical-communication policy changes.
+/.github/CODEOWNERS @hwillGIT
+/.github/workflows/ @hwillGIT
+/.github/PULL_REQUEST_TEMPLATE.md @hwillGIT
+/.agents/skills/write-timeless-technical-prose/ @hwillGIT
+/tests/test_github_technical_communication.py @hwillGIT

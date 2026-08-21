@@ -1,25 +1,29 @@
 # Governance
 
-The Library of Context uses a maintainer-led, evidence-seeking model.
+Maintainers direct the Library of Context project. They use documented evidence to
+evaluate changes.
 
 ## Decision principles
 
-- Preserve durability, bounded-context, local-first, and privacy invariants.
-- Prefer measured behavior over scale claims.
-- Keep vendor-specific integrations behind adapters.
-- Document meaningful alternatives and failure modes.
-- Make durable schema and public API changes through visible design discussion.
+- Preserve durability, bounded prompts, local operation, and privacy boundaries.
+- Use measured behavior instead of unsupported scale claims.
+- Put vendor-specific integrations behind adapters.
+- Document viable alternatives and failure modes.
+- Discuss durable schema and public application programming interface changes publicly.
 
-Maintainers merge focused changes after review and may ask for an RFC for changes that
-affect persistence, ordering, security, retrieval semantics, or compatibility.
+Maintainers merge focused changes after review. A maintainer can require a request for
+comments (RFC) for a high-impact change.
+
+High-impact changes affect persistence, ordering, security, retrieval behavior, or
+compatibility.
 
 ## Becoming a maintainer
 
-Sustained contributors may be invited as maintainers based on technical judgment,
-review quality, reliability, inclusive collaboration, and care for project invariants.
-Maintainer access is not based only on commit count.
+Maintainers can invite sustained contributors to join the maintainer group. They assess
+technical judgment, review quality, reliability, inclusive collaboration, and care for
+project invariants. Commit count alone does not determine access.
 
 ## Changes to governance
 
-Governance changes should be proposed publicly, include motivation and alternatives,
-and allow reasonable time for community feedback.
+Propose governance changes in a public project channel. Include the reason and viable
+alternatives. Allow reasonable time for community feedback.

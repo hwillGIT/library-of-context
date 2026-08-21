@@ -3,8 +3,10 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from .scopes import ContextScope, validate_record_scope
 
-@dataclass(slots=True)
+
+@dataclass(frozen=True, slots=True)
 class ContextRecord:
     id: str
     namespace: str
@@ -19,6 +21,19 @@ class ContextRecord:
     accessed_at: float = 0.0
     expires_at: float | None = None
     content_hash: str = ""
+    scope: ContextScope = ContextScope.PROJECT
+    owner_session_id: str | None = None
+    team_id: str | None = None
+
+    def __post_init__(self) -> None:
+        scope, owner_session_id, team_id = validate_record_scope(
+            self.scope,
+            self.owner_session_id,
+            self.team_id,
+        )
+        object.__setattr__(self, "scope", scope)
+        object.__setattr__(self, "owner_session_id", owner_session_id)
+        object.__setattr__(self, "team_id", team_id)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -41,6 +56,13 @@ class ContextRecord:
                 None if value.get("expires_at") is None else float(value["expires_at"])
             ),
             content_hash=str(value.get("content_hash", "")),
+            scope=ContextScope(value.get("scope", ContextScope.PROJECT)),
+            owner_session_id=(
+                None
+                if value.get("owner_session_id") is None
+                else str(value["owner_session_id"])
+            ),
+            team_id=(None if value.get("team_id") is None else str(value["team_id"])),
         )
 
 
@@ -145,7 +167,7 @@ class PromptEnvelope:
         }
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class ContextEvent:
     """One durable event in a governed agent thread."""
 
@@ -196,9 +218,22 @@ class ContextWatermarks:
     indexed_through: int = 0
     team_synced_through: int = 0
     pending_events: int = 0
+    failed_events: int = 0
 
     def to_dict(self) -> dict[str, int]:
         return asdict(self)
+
+
+@dataclass(frozen=True, slots=True)
+class OutboxClaim:
+    """Leased indexing work selected from the durable outbox."""
+
+    namespace: str
+    event_id: str
+    session_id: str
+    sequence: int
+    attempts: int
+    claim_token: str
 
 
 @dataclass(slots=True)

@@ -3,9 +3,13 @@ from __future__ import annotations
 import queue
 import threading
 from collections import deque
+from copy import deepcopy
+from dataclasses import replace
 from typing import Generic, TypeVar
 
+from .embeddings import estimate_tokens
 from .models import ContextEvent
+from .text_budget import EVENT_TRUNCATION_MARKER, truncate_text
 
 T = TypeVar("T")
 
@@ -19,25 +23,51 @@ class RecentEventRing:
         self._events: deque[ContextEvent] = deque()
         self._ids: set[str] = set()
         self._tokens = 0
+        self._highest_sequence = 0
         self._lock = threading.RLock()
 
     def append(self, event: ContextEvent) -> None:
         with self._lock:
-            if event.event_id in self._ids:
+            if event.event_id in self._ids or event.sequence <= self._highest_sequence:
                 return
-            self._events.append(event)
-            self._ids.add(event.event_id)
-            self._tokens += event.token_count + 4
-            while len(self._events) > self.max_events or (
-                len(self._events) > 1 and self._tokens > self.max_tokens
-            ):
+            projected = replace(event, metadata=deepcopy(event.metadata))
+            if event.token_count + 4 > self.max_tokens:
+                content = truncate_text(
+                    event.content,
+                    self.max_tokens - 4,
+                    marker=EVENT_TRUNCATION_MARKER,
+                )
+                projected = replace(
+                    projected,
+                    content=content,
+                    token_count=estimate_tokens(content),
+                )
+            self._events.append(projected)
+            self._ids.add(projected.event_id)
+            self._highest_sequence = event.sequence
+            self._tokens += projected.token_count + 4
+            while len(self._events) > self.max_events or self._tokens > self.max_tokens:
                 removed = self._events.popleft()
                 self._ids.discard(removed.event_id)
                 self._tokens -= removed.token_count + 4
 
     def snapshot(self) -> list[ContextEvent]:
         with self._lock:
-            return list(self._events)
+            return [
+                replace(event, metadata=deepcopy(event.metadata))
+                for event in self._events
+            ]
+
+    def set_protected(self, event_id: str, protected: bool) -> bool:
+        """Update the process-local projection of a durable event."""
+
+        with self._lock:
+            for index, event in enumerate(self._events):
+                if event.event_id != event_id:
+                    continue
+                self._events[index] = replace(event, protected=protected)
+                return True
+        return False
 
     def stats(self) -> dict[str, int]:
         with self._lock:
@@ -85,14 +115,22 @@ class UniqueWorkQueue(Generic[T]):
 
     @property
     def available(self) -> int:
-        return max(0, self.capacity - self.queued)
+        with self._lock:
+            return max(0, self.capacity - len(self._pending))
+
+    @property
+    def pending(self) -> int:
+        with self._lock:
+            return len(self._pending)
 
     def stats(self) -> dict[str, int | float]:
         queued = self.queued
+        pending = self.pending
         return {
             "queued": queued,
+            "pending": pending,
             "capacity": self.capacity,
-            "occupancy": queued / self.capacity,
+            "occupancy": pending / self.capacity,
         }
 
 

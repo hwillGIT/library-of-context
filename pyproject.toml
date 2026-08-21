@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "library-of-context"
-version = "0.3.0"
+dynamic = ["version"]
 description = "Local-first semantic paging and durable virtual memory for bounded model context"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -59,6 +59,9 @@ context-cache = "context_cache.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["context_cache*", "library_of_context*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "context_cache.version.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

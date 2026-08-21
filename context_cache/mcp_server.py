@@ -8,10 +8,17 @@ from collections.abc import Callable
 from typing import Any
 
 from . import mcp_views
+from .client import (
+    DEFAULT_DAEMON_TIMEOUT_SECONDS,
+    DaemonClientError,
+    LibraryDaemonClient,
+)
+from .daemon_auth import read_daemon_token
 from .embeddings import HashingEmbedder, OllamaEmbedder
 from .library import LibraryOfContext
 from .mcp_schema import SERVER_INSTRUCTIONS, TOOLS
-from .mcp_service import LibraryMCPTools
+from .mcp_service import DaemonMCPTools, LibraryMCPTools
+from .version import __version__
 
 _book = mcp_views.book_view
 _desk = mcp_views.desk_view
@@ -24,14 +31,39 @@ _tool_result = mcp_views.tool_result
 
 
 class LibraryMCPServer:
-    def __init__(self, library: LibraryOfContext) -> None:
-        self._tools = LibraryMCPTools(library)
-        self.library = self._tools.library
-        self.desk = self._tools.desk
-        self._session_registry = self._tools.session_registry
-        self._governor_registry = self._tools.governor_registry
-        self.sessions = self._tools.sessions
-        self.governors = self._tools.governors
+    def __init__(
+        self,
+        library: LibraryOfContext | None = None,
+        *,
+        daemon_client: LibraryDaemonClient | None = None,
+        default_collection: str | None = None,
+    ) -> None:
+        if (library is None) == (daemon_client is None):
+            raise ValueError("provide one local Library or one daemon client")
+        if daemon_client is not None:
+            remote_tools = DaemonMCPTools(
+                daemon_client,
+                default_collection=default_collection,
+            )
+            self._tools = remote_tools
+            self.library = None
+            self.desk = None
+            self._session_registry = None
+            self._governor_registry = None
+            self.sessions: dict[str, Any] = {}
+            self.governors: dict[str, Any] = {}
+            self.runtime_id: str | None = remote_tools.runtime_id
+        else:
+            assert library is not None
+            local_tools = LibraryMCPTools(library)
+            self._tools = local_tools
+            self.library = local_tools.library
+            self.desk = local_tools.desk
+            self._session_registry = local_tools.session_registry
+            self._governor_registry = local_tools.governor_registry
+            self.sessions = local_tools.sessions
+            self.governors = local_tools.governors
+            self.runtime_id = None
         self.shutdown_requested = False
         self.exit_requested = False
         self._request_handlers: dict[
@@ -53,7 +85,7 @@ class LibraryMCPServer:
         return {
             "protocolVersion": params.get("protocolVersion", "2025-06-18"),
             "capabilities": {"tools": {"listChanged": False}},
-            "serverInfo": {"name": "library-of-context", "version": "0.3.0"},
+            "serverInfo": {"name": "library-of-context", "version": __version__},
             "instructions": SERVER_INSTRUCTIONS,
         }
 
@@ -130,25 +162,63 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--ram-mb", type=int, default=256)
     parser.add_argument("--embedder", choices=["hashing", "ollama"], default="hashing")
     parser.add_argument("--ollama-model", default="nomic-embed-text")
+    parser.add_argument(
+        "--daemon-url",
+        default=os.environ.get("LIBRARY_OF_CONTEXT_DAEMON_URL"),
+        help=(
+            "forward MCP tool calls to a loopback Library daemon instead of opening "
+            "a local runtime"
+        ),
+    )
+    parser.add_argument(
+        "--daemon-timeout-seconds",
+        type=float,
+        default=os.environ.get(
+            "LIBRARY_OF_CONTEXT_DAEMON_TIMEOUT_SECONDS",
+            str(DEFAULT_DAEMON_TIMEOUT_SECONDS),
+        ),
+        help="loopback daemon request timeout in seconds",
+    )
+    parser.add_argument(
+        "--daemon-token-file",
+        default=os.environ.get("LIBRARY_OF_CONTEXT_DAEMON_TOKEN_FILE"),
+        help="owner-readable bearer-token file for --daemon-url",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    embedder = (
-        OllamaEmbedder(model=args.ollama_model)
-        if args.embedder == "ollama"
-        else HashingEmbedder()
-    )
-    library = LibraryOfContext(
-        args.db,
-        namespace=args.namespace,
-        ram_bytes=args.ram_mb * 1024 * 1024,
-        redis_url="" if args.no_redis else args.redis_url,
-        redis_required=args.redis_required,
-        embedder=embedder,
-    )
-    server = LibraryMCPServer(library)
+    if args.daemon_url:
+        try:
+            if not args.daemon_token_file:
+                raise ValueError("--daemon-token-file is required with --daemon-url")
+            server = LibraryMCPServer(
+                daemon_client=LibraryDaemonClient(
+                    args.daemon_url,
+                    bearer_token=read_daemon_token(args.daemon_token_file),
+                    timeout=args.daemon_timeout_seconds,
+                ),
+                default_collection=args.namespace,
+            )
+        except (DaemonClientError, RuntimeError, ValueError) as exc:
+            print(f"Library MCP bridge could not start: {exc}", file=sys.stderr)
+            return 2
+    else:
+        embedder = (
+            OllamaEmbedder(model=args.ollama_model)
+            if args.embedder == "ollama"
+            else HashingEmbedder()
+        )
+        library = LibraryOfContext(
+            args.db,
+            namespace=args.namespace,
+            ram_bytes=args.ram_mb * 1024 * 1024,
+            redis_url="" if args.no_redis else args.redis_url,
+            redis_required=args.redis_required,
+            embedder=embedder,
+        )
+        server = LibraryMCPServer(library)
     try:
         for raw_line in sys.stdin.buffer:
             try:

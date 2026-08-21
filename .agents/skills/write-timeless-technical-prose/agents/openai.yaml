@@ -1,4 +1,7 @@
 interface:
-  display_name: "Timeless Technical Prose"
-  short_description: "Write timeless, non-historical technical prose"
-  default_prompt: "Use $write-timeless-technical-prose to edit these materials into one coherent technical present."
+  display_name: "Plain Technical Prose"
+  short_description: "Translate dense engineering text clearly"
+  default_prompt: "Use $write-timeless-technical-prose to state the risk, mechanical fix, and guaranteed state in plain English, then explain the key concepts."
+
+policy:
+  allow_implicit_invocation: true

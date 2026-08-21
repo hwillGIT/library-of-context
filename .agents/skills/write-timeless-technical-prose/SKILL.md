@@ -1,12 +1,13 @@
 ---
 name: write-timeless-technical-prose
-description: Edit technical documentation, READMEs, architecture pages, examples, API or CLI help, docstrings, and code comments into timeless, non-historical prose written in one coherent editorial present. Use when writing or reviewing repository prose, removing prompt-evident or author-process commentary, eliminating revision history from explanatory text, or enforcing plain standard technical English while preserving necessary status, migration, compatibility, citation, and runtime time semantics.
+description: Edit technical documentation, READMEs, architecture pages, examples, API or CLI help, docstrings, code comments, pull request summaries, review notes, commit messages, and GitHub Actions text into timeless, non-historical prose. Translate dense engineering jargon and concurrency descriptions into plain, active English. Use when a user supplies technical text for translation or when engineering prose needs defined terms and direct explanations. Apply ASD-STE100-aligned Simplified Technical English while preserving necessary status, migration, compatibility, citation, and runtime time semantics.
 ---
 
 # Write Timeless, Non-Historical Technical Prose
 
 Write the artifact as a coherent description of the system, not as a record of the
 conversation or editing process that produced it.
+The result must read as one coherent editorial present.
 
 ## Establish the document's job
 
@@ -31,20 +32,17 @@ job.
    process, or sequence of edits.
 4. Remove release-relative words such as "now," "currently," "previously," "recently,"
    "new," "updated," and "latest" when the sentence remains true without them.
-5. Remove temporal provenance: do not tell readers that a section, feature, class,
-   module, example, or explanation was added before or after another part of the
-   artifact. State the complete structure and behavior directly.
+5. Remove temporal provenance. Do not tell readers when content entered the artifact.
+   State the complete structure and behavior directly.
 6. Move necessary history to a changelog, status page, ADR, migration note, or labeled
    benchmark record.
 7. Preserve precise runtime terms such as "current request," "recent ring," "new
    snapshot," and "previous desk" when they distinguish live states in an algorithm.
 
-Do not use placement or edit-history phrases such as "the section added below," "the
-earlier explanation," "the new module," "now also supports," or "after the refactor."
-Name the section or component and state its contract. Sequence words such as "first,"
-"then," "before," and "after" are appropriate only when they describe a procedure,
-runtime transition, dependency, migration, evaluation protocol, or other technical
-ordering.
+Do not use phrases that show placement or edit history. Examples include "the section
+added below," "the new module," and "after the refactor." Name the component and state
+its contract. Use sequence words only for a technical order. Examples include a
+procedure, runtime transition, dependency, migration, or evaluation protocol.
 
 ## Replace process commentary with technical content
 
@@ -55,10 +53,9 @@ Prefer:
 - `The class separates transport from request dispatch.`
 - `A daemon is justified when duplicate workers exceed the declared resource limit.`
 
-Remove or relocate statements that report a recent fix instead of the resulting
-behavior, acknowledge the request instead of explaining the subject, describe a
-refactoring instead of the resulting boundary, or compare an old and new design without
-an operationally relevant migration constraint.
+Remove statements about the writing request or the edit process. State the resulting
+behavior and component boundary. Compare designs only when a migration or compatibility
+rule needs the comparison.
 
 Do not preserve the sequence of discovery merely because it explains how the author
 arrived at the final structure. Preserve the final structure and the operational
@@ -75,9 +72,109 @@ rationale.
   evidence.
 - Replace promotional superlatives, claims of frictionless operation, and vague verbs
   with measurable behavior or omit them.
-- Avoid claims such as "better," "scalable," "robust," or "production-ready" unless the
-  document states the comparison, workload, evidence, and boundary.
+- Avoid broad claims about quality, capacity, reliability, or release readiness. State
+  the comparison, workload, evidence, and boundary.
 - Keep sentences compact, but retain qualifications that affect correctness.
+
+## Translate dense engineering text
+
+Work as a principal technical writer and concurrency specialist.
+
+A noun stack is a sequence of nouns that acts as one phrase. For example, `worker lease
+recovery policy` is a noun stack.
+
+1. Identify the component that performs each action.
+2. Rewrite passive noun stacks as subject-verb-object sentences.
+3. Replace formal abstractions with concrete components, operations, conditions, and
+   results.
+4. Keep every condition and qualification that affects correctness.
+5. Explain each necessary technical term in plain English.
+
+For concurrency text, preserve these facts:
+
+- who owns the state, lock, lease, task, or resource
+- which operations must occur in order
+- which operation is atomic
+- which lock or transaction protects the operation
+- what happens after contention, timeout, interruption, or failure
+- which queue, memory, worker, time, or retry limit applies
+
+Use this transformation pattern:
+
+```text
+Dense: Expired-lease recovery coordination prevents duplicate claim execution.
+Plain: The coordinator checks an expired lease before another worker claims the task.
+       This check prevents two workers from running the task.
+```
+
+### Output format for a supplied passage
+
+When a user supplies a passage for translation, use exactly these sections:
+
+```markdown
+## Part 1: Plain-English Translation
+
+One or two direct sentences that state the mechanism.
+
+## Part 2: Key Concepts Explained
+
+- **Term:** A plain explanation of the term and its function in the mechanism.
+```
+
+When editing a repository document, keep its existing structure. Put the direct
+translation in the main text. Define key concepts at first use or in the glossary.
+
+### GitHub technical communication
+
+Read
+[references/github-technical-communication.yaml](references/github-technical-communication.yaml)
+for pull request summaries, reviews, commit messages, and GitHub Actions status text.
+
+State the failure risk or conflict first. State the mechanical fix second. State the
+guaranteed result at method completion third.
+
+Use the GitHub policy output format instead of the general passage format. Write one or
+two direct sentences. Then add `**Key Concepts Explained**` and at least three bullets.
+
+A pull request body keeps the hidden risk, fix, and state markers from the repository
+template. The markers enforce the required order without changing the rendered text.
+
+The GitHub Actions check validates the markers, headings, sentence limits, and bullet
+structure. It does not decide whether a claim is technically true. A development agent
+and a reviewer must compare each claim with the implementation, tests, and evidence.
+
+The automated check reads only the pull request body. Apply the same language policy to
+review text and commit messages during authoring and review.
+
+Preserve the implemented mechanism. Do not describe a lock as a transaction. Do not
+describe a transaction as a lock. Name SQLite, Redis, queues, workers, and scopes when
+they affect the invariant.
+
+## Apply the ASD-STE100 software profile
+
+Read [references/asd-ste100-software.yaml](references/asd-ste100-software.yaml) when
+the user requests ASD-STE100, Simplified Technical English, controlled vocabulary, or
+jargon removal.
+
+Use these rules for software documentation:
+
+- Use American English spelling.
+- Use the active voice unless the actor is unknown or unimportant.
+- Use no more than 25 words in a descriptive sentence.
+- Use no more than 20 words in a procedural sentence.
+- Give one instruction in each procedural sentence.
+- Do not use contractions or semicolons in prose.
+- Use a vertical list when one sentence would contain complex information.
+- Keep one topic in each paragraph. Use no more than six sentences.
+- Explain a specialized term at its first important use.
+- Use one term for one concept. Do not use synonyms only for variety.
+- Preserve code identifiers, commands, protocol names, quoted text, and citations.
+
+ASD-STE100 permits technical nouns and technical verbs. Treat required software terms
+as project terminology. Define each term and use it with one stable meaning.
+
+Do not claim formal ASD-STE100 compliance from an automated rewrite. The controlled
+dictionary, technical-term approval, and intended meaning need qualified human review.
 
 ## Treat comments and docstrings as contracts
 

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from .context_markup import format_library_context
 from .embeddings import estimate_tokens
 from .models import ContextEvent, GovernedPrompt, WorkingSet
 from .text_budget import (
@@ -25,6 +27,42 @@ class PromptBudget:
     recent_tokens: int
     protected_tokens: int
     max_books: int
+
+
+def _select_descending_events(
+    events: Iterable[ContextEvent],
+    token_budget: int,
+    *,
+    excluded: set[str] | None = None,
+) -> tuple[list[tuple[ContextEvent, str]], int]:
+    """Select a bounded newest-first stream and return chronological messages."""
+
+    excluded_ids = excluded or set()
+    selected: list[tuple[ContextEvent, str]] = []
+    used = 0
+    for event in events:
+        if event.event_id in excluded_ids:
+            continue
+        available = token_budget - used - 4
+        if available <= 0:
+            break
+        if event.token_count > available:
+            if selected:
+                break
+            content = truncate_text(
+                event.content,
+                available,
+                marker=EVENT_TRUNCATION_MARKER,
+            )
+        else:
+            content = event.content
+        cost = estimate_tokens(content) + 4
+        if used + cost > token_budget:
+            break
+        selected.append((event, content))
+        used += cost
+    selected.reverse()
+    return selected, used
 
 
 class GovernedPromptBuilder:
@@ -95,15 +133,13 @@ class GovernedPromptBuilder:
         selected_recent, recent_tokens = select_event_tail(recent_events, recent_cap)
         recent_ids = {event.event_id for event, _ in selected_recent}
 
-        protected_events = self.library.store.list_thread_events(
-            self.collection,
-            self.session_id,
-            limit=256,
-            protected_only=True,
-        )
         protected_cap = min(self.budget.protected_tokens, available - recent_tokens)
-        selected_protected, _ = select_event_tail(
-            protected_events,
+        selected_protected, _ = _select_descending_events(
+            self.library.store.iter_thread_events_descending(
+                self.collection,
+                self.session_id,
+                protected_only=True,
+            ),
             protected_cap,
             excluded=recent_ids,
         )
@@ -173,9 +209,11 @@ class GovernedPromptBuilder:
         messages: list[dict[str, str]],
         selected_events: list[tuple[ContextEvent, str]],
     ) -> WorkingSet:
-        wrapper = (
-            '<library-context replacement="true" mode="semantic-paging" '
-            f'session="{self.session_id}">\n\n</library-context>'
+        wrapper = format_library_context(
+            "",
+            session_id=self.session_id,
+            refreshed_at=time.time(),
+            mode="semantic-paging",
         )
         desk_budget = max(
             0,
@@ -199,11 +237,11 @@ class GovernedPromptBuilder:
         return self._empty_desk(self.session_id, self.collection, subject)
 
     def _library_block(self, working: WorkingSet) -> str:
-        return (
-            '<library-context replacement="true" mode="semantic-paging" '
-            f'session="{self.session_id}" '
-            f'refreshed_at="{working.refreshed_at}">\n'
-            f"{working.context}\n</library-context>"
+        return format_library_context(
+            working.context,
+            session_id=self.session_id,
+            refreshed_at=working.refreshed_at,
+            mode="semantic-paging",
         )
 
     def _attach_context(
@@ -236,12 +274,14 @@ class GovernedPromptBuilder:
         token_count = message_token_count(messages)
         if token_count > self.budget.total_tokens and working.context:
             overflow = token_count - self.budget.total_tokens
-            target = max(0, estimate_tokens(working.context) - overflow - 2)
-            working.context = truncate_text(
-                working.context,
-                target,
-                marker=EVENT_TRUNCATION_MARKER,
+            target = max(0, estimate_tokens(working.context) - overflow - 8)
+            selected, context = self.desk._pack_hits(
+                working.hits,
+                token_budget=target,
+                top_k=max(1, len(working.hits)),
             )
+            working.hits = selected
+            working.context = context
             working.token_count = estimate_tokens(working.context)
             if working.context:
                 library_block = self._library_block(working)
@@ -252,6 +292,10 @@ class GovernedPromptBuilder:
                     }
                 else:
                     messages[0] = {"role": "system", "content": library_block}
+            elif has_base_message:
+                messages[0] = {"role": "system", "content": system_prompt}
+            else:
+                messages.pop(0)
             token_count = message_token_count(messages)
         if token_count > self.budget.total_tokens:
             raise RuntimeError("governor failed to enforce the context budget")

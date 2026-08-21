@@ -1,11 +1,11 @@
 # Improvement Decision Brief Template
 
-Use this template before proposing a substantial retrieval, storage, context-policy,
-daemon, broker, security, or public-API change. Its purpose is to make the affirmative
-case and the skeptical case reviewable before implementation begins.
+Use this template for a substantial retrieval, storage, context-policy, daemon, broker,
+security, or public-interface change. The template presents supporting and opposing
+cases before implementation.
 
-Small bug fixes do not need a separate brief when the correct behavior is already
-defined by tests or an existing invariant.
+A small bug fix does not need a brief when tests or an invariant define the correct
+behavior. The [glossary](GLOSSARY.md) defines shared terms.
 
 ```markdown
 # <Improvement name>
@@ -13,87 +13,89 @@ defined by tests or an existing invariant.
 Status: proposed | investigating | accepted | deferred | rejected | shipped
 Class: correctness | evidence | scale-triggered | optional accelerator | team-only | research
 Owner: <GitHub handle or unowned>
-Issue/RFC: <link>
+Issue/RFC: <issue or request for comments link>
 Last reviewed: YYYY-MM-DD
 
 ## Problem and current evidence
 
-What observable failure, workload, or quality problem exists now? Include current
-implementation behavior, measurements, affected users, and the invariant at risk.
+Describe the observable failure, workload, or quality problem. Include measured
+behavior. Identify affected users and the invariant at risk.
 
 ## Desired outcome
 
-State the public behavior or non-functional result. Avoid prescribing an implementation
-unless the implementation itself is the decision.
+State the public behavior or quality result. Do not prescribe an implementation unless
+the decision requires that implementation.
 
 ## Why make this change
 
-Explain the benefit and the failure mode it prevents.
+Explain the benefit. Identify the failure that the change prevents.
 
 ## Why not make this change
 
-Explain complexity, cost, recall or latency regressions, new failure modes, privacy
-expansion, operational ownership, and situations where the current design is better.
+Explain complexity and cost. Describe possible recall or latency regressions. Identify
+failure modes, privacy effects, and operational ownership. State when the baseline is
+preferable.
 
 ## Non-goals
 
-List adjacent problems outside the proposal's scope.
+List related problems outside the proposal scope.
 
 ## Alternatives
 
-Include at least two viable options when available. Always include “keep the current
-design” or “defer” and state when that option remains reasonable.
+Include at least two viable options when possible. Include the baseline or deferral
+option. State when that option is reasonable.
 
 ## Recommended seam or contract
 
-Describe the adapter, schema, API, policy boundary, or state machine that keeps the
-change replaceable. Identify authoritative and rebuildable state.
+Describe the adapter, schema, interface, policy boundary, or state machine. Explain how
+this boundary permits replacement. Identify authoritative and rebuildable state.
 
 ## Dependencies and ordering
 
-What correctness, measurement, identity, schema, or security work must exist first?
-Can this work proceed independently of other roadmap branches?
+Identify required correctness, measurement, identity, schema, or security work. State
+whether this work can proceed independently.
 
 ## Adoption trigger
 
-Give the measurable condition that makes the added complexity worthwhile. Examples:
-declared p95/RSS limit exceeded, several local processes duplicating work, first
-cross-principal deployment, or demonstrated continuity failure.
+Give a measurable condition for adopting the added complexity. Examples include an
+exceeded 95th-percentile latency or resident-memory limit. Other examples include
+duplicate local work, cross-user deployment, or a demonstrated continuity failure.
 
 ## Evidence gate
 
-Define the measurements and tests required to accept the change. Performance work must
-include retrieval quality and resource cost. Distributed work must include crash,
-duplicate, reorder, offline, and recovery behavior. Security work must include deny and
-revocation tests.
+Define the measurements and tests for acceptance. Performance work must measure
+retrieval quality and resource cost. Distributed work must test crashes, duplicates,
+reordering, offline operation, and recovery. Security work must test denial and
+revocation.
 
 ## Failure, privacy, and overload behavior
 
-What happens on timeout, queue saturation, disk full, process stop, network partition,
-stale authorization, malformed data, and partial migration? Which data may leave the
-workstation, enter logs, or appear in metrics?
+Describe timeout, full-queue, full-disk, process-stop, network-partition, stale-access,
+malformed-data, and partial-migration behavior. Identify data that can leave the
+workstation. Identify data that can enter logs or metrics.
 
 ## Compatibility, migration, and rollback
 
-Cover schema/API/configuration compatibility, mixed versions, index rebuild, cache
-invalidation, interrupted migration, rollback, and old-data cleanup.
+Cover schema, interface, and configuration compatibility. Cover mixed versions, index
+rebuilds, cache invalidation, interrupted migrations, rollback, and old-data cleanup.
 
 ## Open decisions
 
-List unresolved questions, decision owners, and the experiment or evidence that will
-close each one.
+List unresolved questions and decision owners. Identify the evidence that will resolve
+each question.
 ```
 
 ## Review standard
 
-A brief is ready for implementation discussion when a reviewer can answer:
+A brief is ready for implementation discussion when a reviewer can answer these
+questions:
 
-- Why is this better than leaving the system alone for the declared workload?
+- Why does this change help the declared workload?
 - Which users should not enable it?
-- What new failure can it introduce?
+- What failure can it introduce?
 - What triggers adoption and what evidence permits rejection?
 - Can the local Library still operate if this component is absent or unavailable?
 - Can the change be disabled, rebuilt, migrated, and rolled back safely?
 
-The completed brief should link to benchmark artifacts, threat models, architecture
-decision records, and implementation issues rather than duplicating those materials.
+Link the completed brief to benchmarks, threat models, architecture decision records,
+and implementation issues. Do not duplicate those materials.
