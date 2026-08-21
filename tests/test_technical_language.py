@@ -23,7 +23,7 @@ class TechnicalLanguageTests(unittest.TestCase):
             timeout=30,
         )
 
-    def test_skill_profile_and_reader_guidance_are_connected(self) -> None:
+    def test_skill_profile_and_glossary_are_connected(self) -> None:
         self.assertTrue(CHECKER.is_file())
         self.assertTrue(PROFILE.is_file())
         skill_text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
@@ -31,7 +31,8 @@ class TechnicalLanguageTests(unittest.TestCase):
         self.assertIn("references/asd-ste100-software.yaml", skill_text)
         self.assertIn("ASD-STE100", skill_text)
         self.assertIn("Glossary: GLOSSARY.md", navigation)
-        self.assertIn("Technical language rules: TECHNICAL_LANGUAGE.md", navigation)
+        self.assertNotIn("TECHNICAL_LANGUAGE.md", navigation)
+        self.assertFalse((ROOT / "docs" / "TECHNICAL_LANGUAGE.md").exists())
 
     def test_all_development_agents_receive_the_translation_contract(self) -> None:
         skill_text = (SKILL / "SKILL.md").read_text(encoding="utf-8")

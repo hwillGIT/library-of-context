@@ -116,7 +116,7 @@ A loopback address sends HTTP traffic only inside the local computer. A gateway 
 
 The [agent integration guide](ADD_TO_YOUR_AGENT.md) provides configuration examples. It also explains project and thread separation.
 
-The [glossary](GLOSSARY.md) defines shared terms. The [technical language guide](TECHNICAL_LANGUAGE.md) defines the documentation writing rules.
+The [glossary](GLOSSARY.md) defines shared terms.
 
 ## Limits and evidence
 

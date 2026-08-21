@@ -88,7 +88,6 @@ Mark each review that does not apply. Link evidence for each required review.
 Describe schema, interface, configuration, and operational migration effects. Write
 `none` when there is no effect.
 
-Follow the [technical language guide](../docs/TECHNICAL_LANGUAGE.md),
-[glossary](../docs/GLOSSARY.md), and
+Follow the [glossary](../docs/GLOSSARY.md) and
 [skill profile](../.agents/skills/write-timeless-technical-prose/SKILL.md). Preserve
 code identifiers and quoted text exactly.
