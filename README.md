@@ -116,8 +116,6 @@ flowchart LR
 
 Three terms identify the durable data models. The [glossary](docs/GLOSSARY.md) defines other shared terms.
 
-The [technical language guide](docs/TECHNICAL_LANGUAGE.md) defines the writing rules for repository documentation.
-
 - A **context event** is an ordered source item in one governed chat thread. It can contain a message, instruction, or tool result.
 - A **context record** is a searchable unit. It contains text, a numeric embedding, metadata, origin data, and a visibility scope.
 - A document can produce multiple context records.

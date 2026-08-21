@@ -99,7 +99,6 @@ nav:
       - Roadmap and research: roadmap.md
   - Reference:
       - Glossary: GLOSSARY.md
-      - Technical language rules: TECHNICAL_LANGUAGE.md
       - Python API: API_REFERENCE.md
       - Contributor QA workflow: DEVELOPMENT_WORKFLOW.md
       - Shared-runtime contract evidence: evidence/README.md

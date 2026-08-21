@@ -4,9 +4,8 @@ The project welcomes contributions from developers, researchers, engineers, priv
 specialists, technical writers, and users. The
 [glossary](docs/GLOSSARY.md) defines shared technical terms.
 
-Follow the [technical language guide](docs/TECHNICAL_LANGUAGE.md) and the
-[skill profile](.agents/skills/write-timeless-technical-prose/SKILL.md). Preserve code
-identifiers and quoted text exactly.
+Follow the [skill profile](.agents/skills/write-timeless-technical-prose/SKILL.md).
+Preserve code identifiers and quoted text exactly.
 
 For dense engineering text, name the component and its action. Preserve concurrency
 ownership, operation order, atomic boundaries, failure behavior, and resource limits.

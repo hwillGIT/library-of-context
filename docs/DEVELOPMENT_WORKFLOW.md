@@ -12,10 +12,6 @@ Model Context Protocol (MCP), Hypertext Transfer Protocol (HTTP), and command-li
 interface (CLI) are public boundaries. An application programming interface (API) is a
 defined software interface.
 
-Follow the [technical language guide](TECHNICAL_LANGUAGE.md). The repository skill is
-`.agents/skills/write-timeless-technical-prose/SKILL.md`. Preserve code identifiers and
-quoted text exactly.
-
 ## Change packet
 
 Identify these items before implementation:

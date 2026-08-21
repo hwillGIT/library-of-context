@@ -52,8 +52,7 @@ Do not make reliability or capacity claims without evidence and a stated baselin
 not label explanatory content as updated, latest, or improved. State the resulting
 behavior or measured comparison.
 
-Follow the [technical language guide](docs/TECHNICAL_LANGUAGE.md),
-[glossary](docs/GLOSSARY.md), and
+Follow the [glossary](docs/GLOSSARY.md) and
 [skill profile](.agents/skills/write-timeless-technical-prose/SKILL.md). Preserve code
 identifiers and quoted text exactly.
 

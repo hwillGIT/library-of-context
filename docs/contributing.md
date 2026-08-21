@@ -2,9 +2,7 @@
 
 The project welcomes contributions from developers, researchers, engineers, privacy
 specialists, and technical writers. The [glossary](GLOSSARY.md) defines shared terms.
-Follow the [technical language guide](TECHNICAL_LANGUAGE.md). The repository skill is
-`.agents/skills/write-timeless-technical-prose/SKILL.md`. Preserve code identifiers and
-quoted text exactly.
+Preserve code identifiers and quoted text exactly.
 
 For dense engineering text, name the component and its action. Preserve concurrency
 ownership, operation order, atomic boundaries, failure behavior, and resource limits.
