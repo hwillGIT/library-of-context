@@ -4,6 +4,7 @@ import io
 import json
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -17,6 +18,7 @@ from context_cache.client import (
     DaemonRequestError,
     LibraryDaemonClient,
 )
+from context_cache.daemon_auth import load_or_create_daemon_token
 from context_cache.mcp_server import LibraryMCPServer
 from context_cache.mcp_service import DaemonMCPTools
 from context_cache.server import create_server
@@ -37,15 +39,14 @@ class _DaemonHarness:
             runtime_settings=runtime_settings,
             exclusive_database_owner=True,
         )
-        self.token = "daemon-contract-token-0000000000000001"
+        self.token_file = Path(f"{database}.daemon-token")
+        self.token = load_or_create_daemon_token(self.token_file)
         self.server, _ = create_server(
             self.library,
             "127.0.0.1",
             0,
             auth_token=self.token,
         )
-        self.token_file = Path(f"{database}.daemon-token")
-        self.token_file.write_text(self.token + "\n", encoding="utf-8")
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         port = int(self.server.server_address[1])
@@ -419,6 +420,12 @@ class DaemonBoundaryTests(unittest.TestCase):
 
         self.assertFalse(first.is_alive())
         self.assertEqual(first_failures, [])
+        deadline = time.monotonic() + 2
+        while (
+            self.daemon.server.admission_status()["active_requests"]
+            and time.monotonic() < deadline
+        ):
+            time.sleep(0.01)
         self.assertEqual(self.daemon.server.admission_status()["active_requests"], 0)
 
 
